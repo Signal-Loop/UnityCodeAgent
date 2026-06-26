@@ -1,0 +1,589 @@
+openapi: 3.1.0
+info:
+  title: Agent Service API
+  version: 1.0.0
+  description: |
+    Backend-neutral Agent service contract consumed by Unity.
+    The current .NET service in CopilotService/ is one implementation of this contract.
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port:
+        default: '7777'
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Get service health.
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                state: healthy
+                detail: null
+        '503':
+          description: Service is unhealthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                state: degraded
+                detail: Service unavailable.
+  /api/sessions:
+    get:
+      operationId: listSessions
+      summary: List known sessions.
+      responses:
+        '200':
+          description: Session inventory.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentSessionSummaryDto'
+              example:
+                - SessionId: session-1
+                  StartTime: '2026-05-29T12:00:00+00:00'
+                  ModifiedTime: '2026-05-29T12:05:00+00:00'
+                  Summary: Test session
+                  IsRemote: false
+                  Cwd: C:/work
+                  GitRoot: C:/work
+                  Repository: UnityCodeAgent
+                  Branch: main
+  /api/models:
+    post:
+      operationId: listModels
+      summary: List available models.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListAgentModelsRequestDto'
+      responses:
+        '200':
+          description: Model inventory.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelInfoDto'
+              example:
+                - Id: gpt-5-mini
+                  Name: GPT-5 Mini
+        '400':
+          description: Request rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+  /api/sessions/create:
+    post:
+      operationId: createSession
+      summary: Create and attach a new session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentSessionRequestDto'
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionResponseDto'
+              example:
+                SessionId: session-1
+                Status: ready
+                Messages: []
+        '400':
+          description: Request rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+  /api/sessions/open:
+    post:
+      operationId: openSession
+      summary: Open and attach an existing session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenAgentSessionRequestDto'
+      responses:
+        '200':
+          description: Session opened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionResponseDto'
+              example:
+                SessionId: session-1
+                Status: ready
+                Messages:
+                  - SequenceNumber: 1
+                    SessionId: session-1
+                    TimestampUtc: '2026-05-29T12:00:00+00:00'
+                    Content: hello
+                    StreamKey: assistant-1
+                    Type: AssistantMessage
+                    SourceJson: '{}'
+                    IsSubAgentEvent: false
+        '400':
+          description: Request rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+  /api/sessions/send:
+    post:
+      operationId: sendPrompt
+      summary: Send a prompt to the attached session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendAgentPromptRequestDto'
+      responses:
+        '202':
+          description: Prompt accepted.
+        '400':
+          description: Request rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+  /api/sessions/abort:
+    post:
+      operationId: abortPrompt
+      summary: Abort the active prompt for the attached session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbortAgentPromptRequestDto'
+      responses:
+        '202':
+          description: Abort accepted.
+        '400':
+          description: Request rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+  /api/tools/results:
+    post:
+      operationId: completeToolInvocation
+      summary: Complete a Unity-side custom tool invocation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentToolInvocationResultDto'
+      responses:
+        '202':
+          description: Tool invocation result accepted.
+        '404':
+          description: Tool invocation is no longer pending.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+        '400':
+          description: Request rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - detail
+      properties:
+        state:
+          type: string
+        detail:
+          type: string
+          nullable: true
+    InfiniteSessionsDto:
+      type: object
+      additionalProperties: false
+      properties:
+        Enabled:
+          type: boolean
+          default: false
+        BackgroundCompactionThreshold:
+          type: number
+          format: double
+          default: 0
+        BufferExhaustionThreshold:
+          type: number
+          format: double
+          default: 0
+    ProviderConfigDto:
+      type: object
+      additionalProperties: false
+      properties:
+        Model:
+          type: string
+          nullable: true
+        Type:
+          type: string
+          nullable: true
+        BaseUrl:
+          type: string
+          nullable: true
+        ApiKey:
+          type: string
+          nullable: true
+        WireApi:
+          type: string
+          nullable: true
+        ModelName:
+          type: string
+          nullable: true
+    CreateAgentSessionRequestDto:
+      type: object
+      additionalProperties: false
+      required:
+        - SessionId
+        - Provider
+        - Streaming
+        - InfiniteSessions
+        - WorkingDirectory
+      properties:
+        SessionId:
+          type: string
+        Provider:
+          $ref: '#/components/schemas/ProviderConfigDto'
+        Streaming:
+          type: boolean
+        InfiniteSessions:
+          $ref: '#/components/schemas/InfiniteSessionsDto'
+        WorkingDirectory:
+          type: string
+        SkillDirectories:
+          type: array
+          nullable: true
+          items:
+            type: string
+        DisabledSkills:
+          type: array
+          nullable: true
+          items:
+            type: string
+        Tools:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/AgentToolDefinitionDto'
+      example:
+        SessionId: session-1
+        Provider:
+          Model: gpt-5-mini
+        Streaming: true
+        InfiniteSessions:
+          Enabled: true
+          BackgroundCompactionThreshold: 0.25
+          BufferExhaustionThreshold: 0.75
+        WorkingDirectory: C:/work
+        SkillDirectories: [".agents/skills"]
+        DisabledSkills: ["experimental-feature"]
+    OpenAgentSessionRequestDto:
+      type: object
+      additionalProperties: false
+      required:
+        - SessionId
+        - Provider
+        - Streaming
+        - InfiniteSessions
+        - WorkingDirectory
+      properties:
+        SessionId:
+          type: string
+        Provider:
+          $ref: '#/components/schemas/ProviderConfigDto'
+        Streaming:
+          type: boolean
+        InfiniteSessions:
+          $ref: '#/components/schemas/InfiniteSessionsDto'
+        WorkingDirectory:
+          type: string
+        SkillDirectories:
+          type: array
+          nullable: true
+          items:
+            type: string
+        DisabledSkills:
+          type: array
+          nullable: true
+          items:
+            type: string
+        Tools:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/AgentToolDefinitionDto'
+      example:
+        SessionId: session-1
+        Provider:
+          Model: gpt-5-mini
+        Streaming: true
+        InfiniteSessions:
+          Enabled: false
+          BackgroundCompactionThreshold: 0.0
+          BufferExhaustionThreshold: 0.0
+        WorkingDirectory: C:/work
+        SkillDirectories: [".agents/skills"]
+        DisabledSkills: []
+    ListAgentModelsRequestDto:
+      type: object
+      additionalProperties: false
+      properties:
+        Provider:
+          $ref: '#/components/schemas/ProviderConfigDto'
+      example:
+        Provider:
+          Type: openai
+          BaseUrl: https://example.test
+          ApiKey: secret
+          WireApi: chat
+    SendAgentPromptRequestDto:
+      type: object
+      additionalProperties: false
+      required:
+        - SessionId
+        - Prompt
+      properties:
+        SessionId:
+          type: string
+        Prompt:
+          type: string
+      example:
+        SessionId: session-1
+        Prompt: Reply with exactly VERIFIED
+    AbortAgentPromptRequestDto:
+      type: object
+      additionalProperties: false
+      required:
+        - SessionId
+      properties:
+        SessionId:
+          type: string
+      example:
+        SessionId: session-1
+    AgentToolDefinitionDto:
+      type: object
+      additionalProperties: false
+      required:
+        - Name
+        - Description
+        - InputSchemaJson
+      properties:
+        Name:
+          type: string
+        Description:
+          type: string
+        InputSchemaJson:
+          type: string
+    AgentToolInvocationResultDto:
+      type: object
+      additionalProperties: false
+      required:
+        - CallId
+        - SessionId
+        - ToolName
+        - IsError
+        - TextResult
+      properties:
+        CallId:
+          type: string
+        SessionId:
+          type: string
+        ToolName:
+          type: string
+        IsError:
+          type: boolean
+        TextResult:
+          type: string
+        BinaryResults:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/AgentToolBinaryResultDto'
+        Error:
+          type: string
+          nullable: true
+      example:
+        CallId: tool-call-1
+        SessionId: session-1
+        ToolName: get_unity_info
+        IsError: false
+        TextResult: Unity project info
+        BinaryResults: null
+        Error: null
+    AgentToolBinaryResultDto:
+      type: object
+      additionalProperties: false
+      required:
+        - Data
+        - MimeType
+        - Type
+      properties:
+        Data:
+          type: string
+        MimeType:
+          type: string
+        Type:
+          type: string
+          enum:
+            - image
+            - resource
+        Description:
+          type: string
+          nullable: true
+    ModelInfoDto:
+      type: object
+      additionalProperties: false
+      required:
+        - Id
+        - Name
+      properties:
+        Id:
+          type: string
+        Name:
+          type: string
+    AgentSessionSummaryDto:
+      type: object
+      additionalProperties: false
+      required:
+        - SessionId
+        - StartTime
+        - ModifiedTime
+        - IsRemote
+      properties:
+        SessionId:
+          type: string
+        StartTime:
+          type: string
+          format: date-time
+        ModifiedTime:
+          type: string
+          format: date-time
+        Summary:
+          type: string
+          nullable: true
+        IsRemote:
+          type: boolean
+        Cwd:
+          type: string
+          nullable: true
+        GitRoot:
+          type: string
+          nullable: true
+        Repository:
+          type: string
+          nullable: true
+        Branch:
+          type: string
+          nullable: true
+    AgentSessionResponseDto:
+      type: object
+      additionalProperties: false
+      required:
+        - SessionId
+        - Status
+        - Messages
+      properties:
+        SessionId:
+          type: string
+        Status:
+          type: string
+        Messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentServiceEventEnvelope'
+    AgentServiceErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - Message
+      properties:
+        Message:
+          type: string
+        Code:
+          type: string
+          nullable: true
+    AgentEventType:
+      type: string
+      enum:
+        - Unknown
+        - UserMessage
+        - Session
+        - AssistantMessage
+        - AssistantDelta
+        - Tool
+        - Service
+        - Input
+        - Skill
+        - Subagent
+        - System
+        - Mcp
+        - Resource
+        - Diagnostics
+        - Error
+        - Reasoning
+        - ReasoningDelta
+        - SessionIdle
+        - SessionStatusChanged
+        - ToolInvocationRequest
+    AgentServiceEventEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - SequenceNumber
+        - SessionId
+        - TimestampUtc
+        - Content
+        - Type
+        - SourceJson
+        - IsSubAgentEvent
+      properties:
+        SequenceNumber:
+          type: integer
+          format: int64
+        SessionId:
+          type: string
+        TimestampUtc:
+          type: string
+          format: date-time
+        Content:
+          type: string
+        StreamKey:
+          type: string
+          nullable: true
+        Type:
+          $ref: '#/components/schemas/AgentEventType'
+        SourceJson:
+          type: string
+        IsSubAgentEvent:
+          type: boolean

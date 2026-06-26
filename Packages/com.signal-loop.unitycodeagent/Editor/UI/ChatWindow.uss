@@ -1,0 +1,184 @@
+.chat-window {
+  flex-grow: 1;
+  flex-direction: column;
+  color: var(--unity-colors-window-text);
+  background-color: var(--unity-colors-window-background);
+  --secondary-message-opacity: 0.6;
+}
+
+.chat-scroll-view {
+  background-color: var(--unity-colors-window-background);
+  padding: 10px;
+  flex-grow: 1;
+  padding: 2px
+}
+
+.chat-scroll-view--hidden {
+  display: none;
+}
+
+.chat-composer {
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: 5px;
+  background-color: var(--unity-colors-window-background);
+}
+
+.chat-input {
+  flex-grow: 1;
+  height: 80px;
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 0;
+  white-space: normal;
+  width: 100%;
+  color: var(--unity-colors-default-text);
+  background-color: var(--unity-colors-input_field-background);
+  border-top-left-radius: var(--unity-metrics-default-border_radius);
+  border-top-right-radius: var(--unity-metrics-default-border_radius);
+  border-bottom-left-radius: var(--unity-metrics-default-border_radius);
+  border-bottom-right-radius: var(--unity-metrics-default-border_radius);
+  border-left-color: var(--unity-colors-input_field-border);
+  border-right-color: var(--unity-colors-input_field-border);
+  border-top-color: var(--unity-colors-input_field-border);
+  border-bottom-color: var(--unity-colors-input_field-border);
+}
+
+.chat-actions {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+}
+
+.chat-button {
+  flex-shrink: 0;
+  width: 80px;
+  margin-top: 5px;
+  margin-right: 0;
+  margin-bottom: 5px;
+  margin-left: 0;
+}
+
+.chat-button--right {
+  margin-left: auto;
+}
+
+.chat-model-label {
+  color: var(--unity-colors-label-text);
+  opacity: var(--secondary-message-opacity);
+  margin-top: 0;
+  margin-right: 2px;
+  margin-bottom: 2px;
+  margin-left: 2px;
+  padding: 0;
+  white-space: normal;
+  font-size: 11px;
+}
+
+.chat-message {
+  color: var(--unity-colors-default-text);
+  flex-grow: 0;
+  flex-shrink: 0;
+  margin-top: 2px;
+  margin-right: 5px;
+  margin-bottom: 2px;
+  margin-left: 5px;
+  padding-top: 2px;
+  padding-right: 2px;
+  padding-bottom: 2px;
+  padding-left: 2px;
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.chat-message--default {
+  opacity: var(--secondary-message-opacity);
+}
+
+.chat-message--assistant {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.chat-message--error {
+  border-left-color: #b93030;
+  border-left-width: 3px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.chat-message--prompt {
+  background-color: var(--unity-colors-box-background);
+  border-left-color: #307ab9;
+  border-left-width: 3px;
+  align-self: flex-end;
+  flex-shrink: 1;
+  margin-left: 10%;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.chat-message--reasoning {
+  opacity: var(--secondary-message-opacity);
+}
+
+.chat-message--tool {
+  opacity: var(--secondary-message-opacity);
+}
+
+.chat-message--progress {
+  opacity: var(--secondary-message-opacity);
+  -unity-font-style: italic;
+}
+
+#chat-message .unity-base-text-field__input {
+  border-left-width: 0;
+  border-right-width: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  background-color: rgba(0, 0, 0, 0);
+}
+
+.session-entry {
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  margin-left: 5px;
+  margin-right: 5px;
+  padding: 5px;
+  background-color: var(--unity-colors-box-background);
+  border-top-left-radius: var(--unity-metrics-default-border_radius);
+  border-top-right-radius: var(--unity-metrics-default-border_radius);
+  border-bottom-left-radius: var(--unity-metrics-default-border_radius);
+  border-bottom-right-radius: var(--unity-metrics-default-border_radius);
+}
+
+.session-entry:hover {
+  background-color: var(--unity-colors-list_view_item-background-hover);
+}
+
+.session-entry-name {
+  width: 100%;
+  -unity-font-style: normal;
+  color: var(--unity-colors-default-text);
+  margin: 0;
+  padding: 0;
+}
+
+.session-entry--unfinished .session-entry-name {
+  -unity-font-style: bold;
+}
+
+.session-entry-date {
+  width: 100%;
+  color: var(--unity-colors-label-text);
+  opacity: var(--secondary-message-opacity);
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}

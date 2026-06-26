@@ -1,0 +1,21 @@
+{
+  "name": "com.signal-loop.unitycodeagent",
+  "version": "0.1.1",
+  "displayName": "Unity Code Agent",
+  "description": "A powerful AI agent for the Unity Editor that has the ability to perform any action using Unity Editor API. This includes scripts, scenes, prefabs and assets manipulation, configuration changes, and more.",
+  "unity": "6000.3",
+  "author": {
+    "name": "Signal Loop",
+    "url": "https://www.signal-loop.com"
+  },
+  "keywords": [
+    "mcp",
+    "ai"
+  ],
+  "license": "MIT",
+  "documentationUrl": "https://github.com/Signal-Loop/UnityCodeAgent",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.2",
+    "com.unity.inputsystem": "1.19.0"
+  }
+}

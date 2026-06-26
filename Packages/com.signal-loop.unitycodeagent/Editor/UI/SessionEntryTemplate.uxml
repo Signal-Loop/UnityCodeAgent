@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:VisualElement class="session-entry" name="session-entry">
+        <ui:Label name="session-name" text="Session A" class="session-entry-name"/>
+        <ui:Label name="session-date" text="May 5, 2026" class="session-entry-date"/>
+    </ui:VisualElement>
+</ui:UXML>

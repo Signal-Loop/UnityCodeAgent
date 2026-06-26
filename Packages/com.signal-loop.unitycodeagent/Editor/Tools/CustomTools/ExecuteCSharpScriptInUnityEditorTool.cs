@@ -1,0 +1,188 @@
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using SignalLoop.UnityCodeAgent.Logging;
+using SignalLoop.UnityCodeAgent.Settings;
+using SignalLoop.UnityCodeAgent.Tools.Helpers;
+using SignalLoop.UnityCodeAgent.Tools.Interfaces;
+using SignalLoop.UnityCodeAgent.Tools.Protocol;
+using SignalLoop.UnityCodeAgent.Tools.Services;
+using UnityEditor;
+
+namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
+{
+    /// <summary>
+    /// Executes arbitrary C# script text inside the Unity Editor using Roslyn.
+    /// Captures return value, logs, and errors into a single response payload.
+    /// </summary>
+    public class ExecuteCSharpScriptInUnityEditorTool : IToolAsync, IUnityContextTool
+    {
+        private readonly UnityCodeAgentLogger _log = new UnityCodeAgentLogger();
+        private UnityContext _context;
+        public string Name => "execute_csharp_script_in_unity_editor";
+
+        public string Description =>
+    @"<tool_description>
+Executes a C# script in the Unity Editor context using Roslyn scripting. Use this tool to interact with, query, or modify the Unity Editor and its loaded project.
+</tool_description>
+
+<when_to_use>
+- Modifying scene objects, GameObjects, Components, Transforms, or UI elements.
+- Querying the current Editor or scene state (e.g., listing objects, reading component values).
+- Creating or modifying Prefabs, ScriptableObjects, or other assets via AssetDatabase.
+- Batch-processing or automating Editor tasks.
+- Computing values using Unity math APIs (Mathf, Vector3, Quaternion, Physics) to avoid calculation errors.
+</when_to_use>
+
+<when_not_to_use>
+- Do NOT use to edit C# source files — use file editing tools instead.
+- Do NOT use to read/write plain text/JSON/YAML files — use file tools instead.
+- Do NOT use to install packages or change ProjectSettings — requires dedicated tools.
+</when_not_to_use>
+
+<environment>
+- PRE-IMPORTED NAMESPACES: `System`, `System.Collections.Generic`, `System.Linq`, `UnityEngine`, `UnityEditor`. Do NOT add `using` statements for these.
+- Full access to all project assemblies is available.
+- Synchronous host environment (Main Thread).
+- The active scene is automatically marked dirty after successful execution in edit mode.
+</environment>
+
+<rules>
+1. TOP-LEVEL STATEMENTS ONLY: Write flat code. Do not wrap code in a class or a method body.
+2. EXPLICIT USINGS: Only declare namespaces NOT in the pre-imported list (e.g., `using UnityEngine.UI;`).
+3. NO ASYNC/AWAIT: Do not use async methods or Task-based APIs.
+4. NO BACKGROUND THREADS: All Editor API calls must occur on the main thread. Do not use Task.Run.
+5. OUTPUT CAPTURE: The tool captures `Debug.Log()`, `Debug.LogError()`, and the final evaluated expression. Rely primarily on `Debug.Log()` to return structured data to yourself.
+</rules>
+
+<examples>
+<example>
+<intent>Find a player, handle null, and get position</intent>
+<script>
+var go = GameObject.Find(""Player"");
+if (go == null) {
+    Debug.LogError(""Player not found"");
+    return;
+}
+Debug.Log($""Player position: {go.transform.position}"");
+</script>
+</example>
+</examples>";
+
+        public JToken InputSchema => JsonHelper.ParseElement(@"
+        {
+            ""type"": ""object"",
+            ""properties"": {
+                ""script"": {
+                    ""type"": ""string"",
+                    ""description"": ""The raw C# script to execute. MUST NOT be wrapped in markdown blocks (do not use ```csharp). Provide the raw text only.""
+                }
+            },
+            ""required"": [""script""]
+        }
+        ");
+
+        public void SetContext(UnityContext context)
+            => _context = context;
+
+        public async Task<ToolsCallResult> ExecuteAsync(JToken arguments)
+        {
+            string script = arguments.GetStringOrDefault("script", string.Empty)?.Trim();
+            if (string.IsNullOrWhiteSpace(script))
+            {
+                return CreateToolCallResult(isError: true, status: "error", resultText: null, logs: null, errors: "Script is empty or missing.");
+            }
+
+            ToolsCallResult compilationBlockedResult = GetCompilationBlockedResult();
+            if (compilationBlockedResult != null)
+            {
+                return compilationBlockedResult;
+            }
+
+            ScriptExecutionService executionService = new(_context);
+            ScriptExecutionService.ExecutionResult result = await executionService.ExecuteScriptAsync(script);
+
+            ToolsCallResult toolCallResult = CreateToolCallResult(
+                isError: !result.IsSuccess,
+                status: result.Status,
+                resultText: result.ResultText,
+                logs: result.Logs,
+                errors: result.Errors,
+                assemblies: result.LoadedAssemblies);
+
+            LogToolCallResult(toolCallResult);
+            return toolCallResult;
+        }
+
+        public static ToolsCallResult BuildCompilationBlockedResult(bool isCompiling, bool hasCompileErrors)
+        {
+            string message = EditorCompilationGate.BuildBlockedMessage("execute C# scripts", isCompiling, hasCompileErrors);
+            return CreateToolCallResult(isError: true, status: "error", resultText: null, logs: null, errors: message);
+        }
+
+        private static ToolsCallResult GetCompilationBlockedResult()
+        {
+            if (!EditorCompilationGate.TryGetBlockedMessage("execute C# scripts", out string message))
+            {
+                return null;
+            }
+
+            return CreateToolCallResult(isError: true, status: "error", resultText: null, logs: null, errors: message);
+        }
+
+        private static ToolsCallResult CreateToolCallResult(bool isError, string status, string resultText, string logs, string errors, string[] assemblies = null)
+        {
+            StringBuilder response = new();
+            response.AppendLine($"Status: {status}");
+            response.AppendLine();
+
+            if (!string.IsNullOrWhiteSpace(resultText))
+            {
+                response.AppendLine("### Result");
+                response.AppendLine("```text");
+                response.AppendLine(resultText);
+                response.AppendLine("```");
+            }
+
+            string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
+            response.AppendLine($"**Unity Editor is in {mode}**");
+
+            response.AppendLine("### Logs");
+            response.AppendLine(string.IsNullOrWhiteSpace(logs) ? "(none)" : logs.TrimEnd());
+
+            response.AppendLine("### Errors");
+            response.Append(string.IsNullOrWhiteSpace(errors) ? "(none)" : errors.TrimEnd());
+
+            if (assemblies != null && assemblies.Length > 0)
+            {
+                response.AppendLine();
+                response.AppendLine("### Loaded Assemblies");
+                foreach (string assembly in assemblies)
+                {
+                    response.AppendLine($"- {assembly}");
+                }
+            }
+
+            return ToolsCallResult.TextResult(response.ToString(), isError);
+        }
+
+        private void LogToolCallResult(ToolsCallResult result)
+        {
+            string text = string.Empty;
+            if (result.Content != null && result.Content.Count > 0)
+            {
+                ContentItem first = result.Content[0];
+                text = first != null ? first.Text ?? string.Empty : string.Empty;
+            }
+
+            if (result.IsError)
+            {
+                _log.Error(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool result:\n{text}");
+            }
+            else
+            {
+                _log.Debug(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool result:\n{text}");
+            }
+        }
+    }
+}

@@ -1,0 +1,3 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <ui:TextField name="chat-message" value="template template template template template template template template template template " readonly="true" multiline="true" class="chat-message chat-message--tool" />
+</ui:UXML>

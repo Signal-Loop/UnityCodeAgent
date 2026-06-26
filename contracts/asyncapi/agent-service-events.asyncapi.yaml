@@ -1,0 +1,133 @@
+asyncapi: 3.0.0
+info:
+  title: Agent Service Event Stream
+  version: 1.0.0
+  description: |
+    Backend-neutral global SSE stream contract for Agent service events across all attached sessions.
+defaultContentType: application/json
+servers:
+  local:
+    host: 127.0.0.1:{port}
+    protocol: http
+    variables:
+      port:
+        default: '7777'
+channels:
+  agentEvents:
+    address: /events
+messages:
+  agentServiceEventEnvelope:
+    title: AgentServiceEventEnvelope
+    payload:
+      $ref: '#/components/schemas/AgentServiceEventEnvelope'
+operations:
+  receiveAgentEvents:
+    action: receive
+    channel:
+      $ref: '#/channels/agentEvents'
+    summary: Receive global retained and live Agent service events over SSE.
+    messages:
+      - $ref: '#/messages/agentServiceEventEnvelope'
+    bindings:
+      http:
+        type: request
+        method: GET
+        headers:
+          type: object
+          properties:
+            Accept:
+              type: string
+              const: text/event-stream
+            Last-Event-ID:
+              type: string
+              description: Optional global replay cursor. If supplied, retained events with SequenceNumber greater than this value are replayed first, then live events stream. If omitted, the subscription starts forward-only from the current broker tail.
+components:
+  schemas:
+    AgentEventType:
+      type: string
+      enum:
+        - Unknown
+        - UserMessage
+        - Session
+        - AssistantMessage
+        - AssistantDelta
+        - Tool
+        - Service
+        - Input
+        - Skill
+        - Subagent
+        - System
+        - Mcp
+        - Resource
+        - Diagnostics
+        - Error
+        - Reasoning
+        - ReasoningDelta
+        - SessionIdle
+        - SessionStatusChanged
+        - ToolInvocationRequest
+    AgentToolInvocationRequestDto:
+      type: object
+      additionalProperties: false
+      required:
+        - CallId
+        - SessionId
+        - ToolName
+        - ArgumentsJson
+      properties:
+        CallId:
+          type: string
+        SessionId:
+          type: string
+        ToolName:
+          type: string
+        ArgumentsJson:
+          type: string
+    AgentServiceEventEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - SequenceNumber
+        - SessionId
+        - TimestampUtc
+        - Content
+        - Type
+        - SourceJson
+        - IsSubAgentEvent
+      properties:
+        SequenceNumber:
+          type: integer
+          format: int64
+        SessionId:
+          type: string
+        TimestampUtc:
+          type: string
+          format: date-time
+        Content:
+          type: string
+        StreamKey:
+          type: string
+          nullable: true
+        Type:
+          $ref: '#/components/schemas/AgentEventType'
+        SourceJson:
+          type: string
+        IsSubAgentEvent:
+          type: boolean
+      examples:
+        - SequenceNumber: 1
+          SessionId: session-1
+          TimestampUtc: '2026-05-28T12:00:00+00:00'
+          Content: "first line\nsecond line"
+          StreamKey: assistant-1
+          Type: AssistantDelta
+          SourceJson: '{}'
+          IsSubAgentEvent: false
+        - SequenceNumber: 2
+          SessionId: session-1
+          TimestampUtc: '2026-05-28T12:00:01+00:00'
+          Content: Calling Unity tool 'get_unity_info'
+          StreamKey: unity-tool:tool-call-1
+          Type: ToolInvocationRequest
+          SourceJson: '{"CallId":"tool-call-1","SessionId":"session-1","ToolName":"get_unity_info","ArgumentsJson":"{}"}'
+          IsSubAgentEvent: false

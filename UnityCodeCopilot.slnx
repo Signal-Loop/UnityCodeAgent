@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="UnityCodeAgent.Editor.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Assembly-CSharp-firstpass.csproj" />
+  <Project Path="Assembly-CSharp-Editor-firstpass.csproj" />
+  <Project Path="Packages/com.signal-loop.unitycodeagent/Editor/CopilotService~/UnityCodeCopilot.Service.csproj" />
+  <Project Path="CopilotService.Tests\UnityCodeCopilot.Service.Tests.csproj" />
+</Solution>
