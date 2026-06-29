@@ -21,12 +21,13 @@ MonoBehaviour:
   ShowAllEventsInChat: 0
   TelemetryMode: 1
   OtlpEndpoint: http://localhost:4318/
-  CliTelemetryFilePath: 
-  TelemetryCaptureContent: 0
+  CliTelemetryFilePath: C:\Users\tbory\source\Workspaces\Loop\UnityCodeAgent\.unityCodeAgent\service\logs\telemetry.jsonl
+  TelemetryCaptureContent: 1
   MockAgentService: 0
   AdditionalToolAssemblyNames: []
   InputActionsAssetPath: 
-  ByokBaseUrl: 
+  ProviderType: 0
+  ByokBaseUrl: https://openrouter.ai/api/v1
   Skills:
     _folders:
     - .agents/skills

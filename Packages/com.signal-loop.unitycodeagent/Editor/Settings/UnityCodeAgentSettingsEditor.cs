@@ -26,6 +26,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         private SerializedProperty _otlpEndpoint;
         private SerializedProperty _cliTelemetryFilePath;
         private SerializedProperty _telemetryCaptureContent;
+        private SerializedProperty _providerType;
         private SerializedProperty _byokBaseUrl;
         private SerializedProperty _showEventsSourceInChat;
         private SerializedProperty _showAllEventsInChat;
@@ -46,6 +47,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
             _otlpEndpoint = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.OtlpEndpoint));
             _cliTelemetryFilePath = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.CliTelemetryFilePath));
             _telemetryCaptureContent = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.TelemetryCaptureContent));
+            _providerType = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.ProviderType));
             _byokBaseUrl = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.ByokBaseUrl));
             _showEventsSourceInChat = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.ShowEventsSourceInChat));
             _showAllEventsInChat = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.ShowAllEventsInChat));
@@ -62,18 +64,24 @@ namespace SignalLoop.UnityCodeAgent.Settings
             serializedObject.Update();
             var previousBaseUrlKey = settings.GetCurrentBaseUrlKey();
 
-            EditorGUILayout.LabelField("BYOK", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(_byokBaseUrl, new GUIContent("BaseUrl"));
-            if (!string.IsNullOrWhiteSpace(_byokBaseUrl.stringValue) && !UnityCodeAgentSettings.IsValidHttpsUrl(_byokBaseUrl.stringValue))
+            EditorGUILayout.LabelField("Provider", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(_providerType);
+            if ((UnityCodeAgentProviderType)_providerType.enumValueIndex == UnityCodeAgentProviderType.Byok)
             {
-                EditorGUILayout.HelpBox("BaseUrl must be a full HTTPS URL.", MessageType.Error);
+                EditorGUILayout.PropertyField(_byokBaseUrl, new GUIContent("BaseUrl"));
+                if (!UnityCodeAgentSettings.IsValidHttpsUrl(_byokBaseUrl.stringValue))
+                {
+                    EditorGUILayout.HelpBox("BaseUrl must be a full HTTPS URL.", MessageType.Error);
+                }
+
+                var nextApiKey = EditorGUILayout.PasswordField(new GUIContent("ApiKey"), settings.ByokApiKey ?? string.Empty);
+                if (!string.Equals(nextApiKey, settings.ByokApiKey, StringComparison.Ordinal))
+                {
+                    settings.ByokApiKey = nextApiKey;
+                }
+
+                EditorGUILayout.HelpBox("ApiKey is saved in EditorPrefs and is not written to the settings asset.", MessageType.Info);
             }
-            var nextApiKey = EditorGUILayout.PasswordField(new GUIContent("ApiKey"), settings.ByokApiKey ?? string.Empty);
-            if (!string.Equals(nextApiKey, settings.ByokApiKey, StringComparison.Ordinal))
-            {
-                settings.ByokApiKey = nextApiKey;
-            }
-            EditorGUILayout.HelpBox("ApiKey is saved in EditorPrefs and is not written to the settings asset.", MessageType.Info);
             EditorGUILayout.Space();
             EditorGUILayout.Space();
 

@@ -27,6 +27,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             settings.SetAvailableModels(new[] { new ModelInfoDto("gpt-5-mini", "GPT-5 Mini") });
             Assert.That(settings.SelectModel(new ModelInfoDto("gpt-5-mini", "GPT-5 Mini")), Is.True);
 
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1/";
 
             Assert.That(settings.HasValidSelectedModel(), Is.False);
@@ -41,6 +42,7 @@ namespace SignalLoop.UnityCodeAgent.Service
         public void ClearAvailableModelsAndSelection_ClearsListModelAndBaseUrl()
         {
             var settings = CreateSettings();
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1";
             settings.SetAvailableModels(new[] { new ModelInfoDto("provider-model", "Provider Model") });
             settings.SelectModel(new ModelInfoDto("provider-model", "Provider Model"));
@@ -60,6 +62,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var previousApiKey = settings.ByokApiKey;
             try
             {
+                settings.ProviderType = UnityCodeAgentProviderType.Byok;
                 settings.ByokBaseUrl = "https://provider.example/v1";
                 settings.SetAvailableModels(new[] { new ModelInfoDto("provider-model", "Provider Model") });
                 Assert.That(settings.SelectModel(new ModelInfoDto("provider-model", "Provider Model")), Is.True);
@@ -93,6 +96,7 @@ namespace SignalLoop.UnityCodeAgent.Service
         public void SelectModel_StampsCurrentModelListAndProviderUsesSelectedModel()
         {
             var settings = CreateSettings();
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1/";
             settings.SetAvailableModels(new[] { new ModelInfoDto("provider-model", "Provider Model") });
 
@@ -103,6 +107,39 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(provider.ModelName, Is.EqualTo("Provider Model"));
             Assert.That(provider.BaseUrl, Is.EqualTo("https://provider.example/v1"));
             Assert.That(validationMessage, Is.Empty);
+        }
+
+        [Test]
+        [Description("Goal: verify Copilot provider ignores stale BYOK credentials. Scope: UnityCodeAgentSettings provider config only. Boundaries: excludes inspector rendering and service calls.")]
+        public void TryCreateProviderConfig_CopilotWithStaleByokFields_DoesNotSendByok()
+        {
+            var settings = CreateSettings();
+            settings.ProviderType = UnityCodeAgentProviderType.Copilot;
+            settings.ByokBaseUrl = "https://provider.example/v1/";
+            settings.SetAvailableModels(new[] { new ModelInfoDto("gpt-5-mini", "GPT-5 Mini") });
+            Assert.That(settings.SelectModel(new ModelInfoDto("gpt-5-mini", "GPT-5 Mini")), Is.True);
+
+            Assert.That(settings.TryCreateProviderConfig(out var provider, out var validationMessage), Is.True);
+            Assert.That(provider.Model, Is.EqualTo("gpt-5-mini"));
+            Assert.That(provider.HasByok, Is.False);
+            Assert.That(provider.BaseUrl, Is.Null);
+            Assert.That(provider.ApiKey, Is.Null);
+            Assert.That(settings.GetCurrentBaseUrlKey(), Is.Empty);
+            Assert.That(validationMessage, Is.Empty);
+        }
+
+        [TestCase("")]
+        [TestCase("http://provider.example/v1")]
+        [Description("Goal: verify BYOK provider requires a full HTTPS BaseUrl. Scope: UnityCodeAgentSettings provider validation only. Boundaries: excludes inspector rendering and service calls.")]
+        public void TryCreateProviderConfig_ByokWithMissingOrInvalidBaseUrl_ReturnsValidationError(string baseUrl)
+        {
+            var settings = CreateSettings();
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
+            settings.ByokBaseUrl = baseUrl;
+
+            Assert.That(settings.TryCreateProviderConfig(out var provider, out var validationMessage), Is.False);
+            Assert.That(provider, Is.Null);
+            Assert.That(validationMessage, Is.EqualTo("BaseUrl must be a full HTTPS URL."));
         }
 
         private static UnityCodeAgentSettings CreateSettings()

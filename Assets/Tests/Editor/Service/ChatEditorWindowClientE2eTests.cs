@@ -63,7 +63,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             => new UnityContext(
                 new UnityCodeAgentPaths("C:/UnityProject"),
                 ProviderConfigDto.Empty,
-                "Select a model in Unity Code Agent settings before chatting.",
+                "Select a model in Unity Code Agent settings then retry.",
                 true,
                 false,
                 false,
@@ -91,7 +91,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             else if (!settings.HasValidSelectedModel())
             {
                 provider = ProviderConfigDto.Empty;
-                validationMessage = "Select a model in Unity Code Agent settings before chatting.";
+                validationMessage = "Select a model in Unity Code Agent settings then retry.";
             }
 
             return new UnityContext(
@@ -583,7 +583,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(result.Success, Is.False);
             Assert.That(
                 result.Updates.OfType<ChatShowErrorUpdate>().Single().Message,
-                Is.EqualTo("Select a model in Unity Code Agent settings before chatting."));
+                Is.EqualTo("Select a model in Unity Code Agent settings then retry."));
             Assert.That(result.Updates.OfType<ChatSetBusyStateUpdate>().Single().IsBusy, Is.False);
             Assert.That(harness.ApiOperations, Is.Empty);
         }
@@ -603,7 +603,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(result.Success, Is.False);
             Assert.That(
                 result.Updates.OfType<ChatShowErrorUpdate>().Single().Message,
-                Is.EqualTo("Select a model in Unity Code Agent settings before chatting."));
+                Is.EqualTo("Select a model in Unity Code Agent settings then retry."));
             Assert.That(result.Updates.OfType<ChatShowAgentEventUpdate>(), Is.Empty);
             Assert.That(result.Updates.OfType<ChatSetBusyStateUpdate>().Single().IsBusy, Is.False);
             Assert.That(harness.ApiOperations, Is.Empty);
@@ -616,6 +616,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var settings = CreateTestSettings();
             settings.SetAvailableModels(new[] { new ModelInfoDto("gpt-4o", "GPT-4o") });
             Assert.That(settings.SelectModel(new ModelInfoDto("gpt-4o", "GPT-4o")), Is.True);
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1";
             var harness = new ModelChangeHarness(settings);
             var context = CreateContextFromSettings(settings);
@@ -625,7 +626,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             Assert.That(result.Success, Is.False);
             Assert.That(result.Updates.OfType<ChatSetModelLabelUpdate>().Single().ModelLabel, Is.EqualTo("No model selected"));
-            Assert.That(result.Updates.OfType<ChatShowErrorUpdate>().Single().Message, Is.EqualTo("Select a model in Unity Code Agent settings before chatting."));
+            Assert.That(result.Updates.OfType<ChatShowErrorUpdate>().Single().Message, Is.EqualTo("Select a model in Unity Code Agent settings then retry."));
             Assert.That(harness.ApiOperations, Is.Empty);
         }
 
@@ -643,7 +644,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             Assert.That(result.Success, Is.False);
             Assert.That(result.Updates.OfType<ChatSetModelLabelUpdate>().Single().ModelLabel, Is.EqualTo("No model selected"));
-            Assert.That(result.Updates.OfType<ChatShowErrorUpdate>().Single().Message, Is.EqualTo("Select a model in Unity Code Agent settings before chatting."));
+            Assert.That(result.Updates.OfType<ChatShowErrorUpdate>().Single().Message, Is.EqualTo("Select a model in Unity Code Agent settings then retry."));
             Assert.That(harness.ApiOperations, Is.Empty);
         }
 
@@ -652,6 +653,7 @@ namespace SignalLoop.UnityCodeAgent.Service
         public async Task SubmitPrompt_ExplicitSelectionAfterRefresh_RoutesWithCurrentBaseUrlAndModel()
         {
             var settings = CreateTestSettings();
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1/";
             settings.SetAvailableModels(new[] { new ModelInfoDto("provider-model", "Provider Model") });
             Assert.That(settings.SelectModel(new ModelInfoDto("provider-model", "Provider Model")), Is.True);
@@ -682,6 +684,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var initResult = await client.InitializeAsync(context, CancellationToken.None);
             Assert.That(initResult.Success, Is.True);
 
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1";
             context = CreateContextFromSettings(settings);
             var updates = await WaitForUpdatesAsync(
@@ -708,6 +711,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var initResult = await client.InitializeAsync(context, CancellationToken.None);
             Assert.That(initResult.Success, Is.True);
 
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1";
             context = CreateContextFromSettings(settings);
             for (var index = 0; index < 5; index++)
@@ -862,6 +866,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(sessionsResult.Success, Is.True);
             Assert.That(client.IsShowingSessions, Is.True);
 
+            settings.ProviderType = UnityCodeAgentProviderType.Byok;
             settings.ByokBaseUrl = "https://provider.example/v1";
             context = CreateContextFromSettings(settings);
             var submitResult = await client.SubmitPromptAsync(context, "start new session", CancellationToken.None);
@@ -871,7 +876,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(submitResult.Updates.OfType<ChatShowMessagesUpdate>().Single(), Is.Not.Null);
             Assert.That(
                 submitResult.Updates.OfType<ChatShowErrorUpdate>().Single().Message,
-                Is.EqualTo("Select a model in Unity Code Agent settings before chatting."));
+                Is.EqualTo("Select a model in Unity Code Agent settings then retry."));
             Assert.That(harness.ApiOperations, Is.EqualTo(new[] { "list" }));
         }
 

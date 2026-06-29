@@ -24,6 +24,12 @@ namespace SignalLoop.UnityCodeAgent.Settings
         Custom = 3,
     }
 
+    public enum UnityCodeAgentProviderType
+    {
+        Copilot = 0,
+        Byok = 1,
+    }
+
     public sealed class UnityCodeAgentSettings : ScriptableObject
     {
         private const string ByokApiKeyEditorPrefsKey = "SignalLoop.UnityCodeAgent.Settings.ByokApiKey";
@@ -81,7 +87,10 @@ namespace SignalLoop.UnityCodeAgent.Settings
         [Tooltip("AssetDatabase path to the InputActionAsset used by play_unity_game. Leave empty to auto-detect.")]
         public string InputActionsAssetPath = string.Empty;
 
-        [Tooltip("Full HTTPS base URL for the BYOK provider. Leave empty to use the default Copilot authentication flow.")]
+        [Tooltip("Provider used for model listing and chat sessions.")]
+        public UnityCodeAgentProviderType ProviderType = UnityCodeAgentProviderType.Copilot;
+
+        [Tooltip("Full HTTPS base URL for the BYOK provider.")]
         public string ByokBaseUrl = string.Empty;
 
         [Tooltip("Project-relative skill folders and disabled skill names.")]
@@ -151,8 +160,19 @@ namespace SignalLoop.UnityCodeAgent.Settings
             provider = null;
             validationMessage = string.Empty;
 
+            if (ProviderType != UnityCodeAgentProviderType.Byok)
+            {
+                provider = ProviderConfigDto.Create(
+                    HasValidSelectedModel() ? Model : null,
+                    null,
+                    null,
+                    null,
+                    null);
+                return true;
+            }
+
             var trimmedBaseUrl = (ByokBaseUrl ?? string.Empty).Trim();
-            if (!string.IsNullOrWhiteSpace(trimmedBaseUrl) && !IsValidHttpsUrl(trimmedBaseUrl))
+            if (!IsValidHttpsUrl(trimmedBaseUrl))
             {
                 validationMessage = "BaseUrl must be a full HTTPS URL.";
                 return false;
@@ -168,7 +188,9 @@ namespace SignalLoop.UnityCodeAgent.Settings
         }
 
         public string GetCurrentBaseUrlKey()
-            => ProviderConfigDto.NormalizeBaseUrl(ByokBaseUrl) ?? string.Empty;
+            => ProviderType == UnityCodeAgentProviderType.Byok
+                ? ProviderConfigDto.NormalizeBaseUrl(ByokBaseUrl) ?? string.Empty
+                : string.Empty;
 
         public bool HasValidSelectedModel()
         {
@@ -476,7 +498,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
             else if (!settings.HasValidSelectedModel())
             {
                 provider = ProviderConfigDto.Empty;
-                validationMessage = "Select a model in Unity Code Agent settings before chatting.";
+                validationMessage = "Select a model in Unity Code Agent settings then retry.";
             }
 
             return new UnityContext(
