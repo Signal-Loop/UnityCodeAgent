@@ -19,9 +19,14 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
     {
         private readonly UnityCodeAgentLogger _log = new UnityCodeAgentLogger();
         private const string DefaultMimeType = "image/png";
+        private const string ScreenshotArtifactDirectoryName = "screenshots";
+        private const int MaxRetainedScreenshotCount = 50;
+        private const long MaxRetainedScreenshotBytes = 100L * 1024L * 1024L;
         private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan DefaultPollInterval = TimeSpan.FromMilliseconds(50);
+        private static readonly TimeSpan MaxRetainedScreenshotAge = TimeSpan.FromDays(3);
         private readonly Func<string> _createTempPath;
+        private readonly Func<string> _getArtifactDirectory;
         private readonly Action<string> _requestScreenshot;
         private readonly TimeSpan _timeout;
         private readonly TimeSpan _pollInterval;
@@ -36,11 +41,22 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             Action<string> requestScreenshot,
             TimeSpan? timeout,
             TimeSpan? pollInterval)
+            : this(createTempPath, requestScreenshot, timeout, pollInterval, null)
+        {
+        }
+
+        public GetUnityGameViewWindowScreenshotTool(
+            Func<string> createTempPath,
+            Action<string> requestScreenshot,
+            TimeSpan? timeout,
+            TimeSpan? pollInterval,
+            Func<string> getArtifactDirectory)
         {
             _createTempPath = createTempPath ?? CreateTempScreenshotPath;
             _requestScreenshot = requestScreenshot ?? RequestScreenshot;
             _timeout = timeout ?? DefaultTimeout;
             _pollInterval = pollInterval ?? DefaultPollInterval;
+            _getArtifactDirectory = getArtifactDirectory ?? GetDefaultArtifactDirectory;
         }
 
         public string Name => "get_unity_game_view_window_screenshot";
@@ -87,10 +103,18 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             }
 
             var mimeType = string.IsNullOrWhiteSpace(scaledResult.MimeType) ? DefaultMimeType : scaledResult.MimeType;
+            var artifactPath = PersistScreenshotArtifact(scaledResult.Base64Data);
 
-            _log.Debug(nameof(GetUnityGameViewWindowScreenshotTool), $"Successfully captured and scaled screenshot. Data length: {scaledResult.Base64Data.Length}, MimeType: {mimeType}");
+            _log.Debug(nameof(GetUnityGameViewWindowScreenshotTool), $"Successfully captured and scaled screenshot. Data length: {scaledResult.Base64Data.Length}, MimeType: {mimeType}, ArtifactPath: {artifactPath}");
 
-            return ToolsCallResult.ImageResult(scaledResult.Base64Data, mimeType);
+            return new ToolsCallResult
+            {
+                Content = new List<ContentItem>
+                {
+                    ContentItem.TextContent($"Screenshot saved to: {artifactPath}\nPNG image data is also attached for clients that support binary image tool results."),
+                    ContentItem.ImageContent(scaledResult.Base64Data, mimeType)
+                }
+            };
         }
 
         private async Task<CaptureResult> CaptureGameViewScreenshotAsync()
@@ -129,6 +153,117 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             var tempDir = Path.Combine(Application.dataPath, "..", "Temp", "UnityGameViewScreenshots");
             Directory.CreateDirectory(tempDir);
             return Path.Combine(tempDir, $"game_view_{Guid.NewGuid():N}.png");
+        }
+
+        private static string GetDefaultArtifactDirectory()
+        {
+            return Path.GetFullPath(Path.Combine(Application.dataPath, "..", ".unityCodeAgent", ScreenshotArtifactDirectoryName));
+        }
+
+        private string PersistScreenshotArtifact(string base64Data)
+        {
+            byte[] pngBytes = Convert.FromBase64String(base64Data);
+            var artifactDirectory = _getArtifactDirectory();
+            Directory.CreateDirectory(artifactDirectory);
+
+            var artifactPath = Path.Combine(
+                artifactDirectory,
+                $"game_view_{DateTime.UtcNow:yyyyMMdd_HHmmss_fff}_{Guid.NewGuid():N}.png");
+
+            File.WriteAllBytes(artifactPath, pngBytes);
+            PruneScreenshotArtifacts(artifactDirectory, artifactPath);
+            return Path.GetFullPath(artifactPath);
+        }
+
+        private static void PruneScreenshotArtifacts(string artifactDirectory, string preservedPath)
+        {
+            if (string.IsNullOrWhiteSpace(artifactDirectory) || !Directory.Exists(artifactDirectory))
+            {
+                return;
+            }
+
+            var preservedFullPath = string.IsNullOrWhiteSpace(preservedPath) ? null : Path.GetFullPath(preservedPath);
+            var cutoffUtc = DateTime.UtcNow - MaxRetainedScreenshotAge;
+
+            foreach (var file in GetScreenshotFiles(artifactDirectory))
+            {
+                if (IsPreservedFile(file, preservedFullPath))
+                {
+                    continue;
+                }
+
+                if (file.LastWriteTimeUtc < cutoffUtc)
+                {
+                    TryDeleteFile(file.FullName);
+                }
+            }
+
+            var files = GetScreenshotFiles(artifactDirectory);
+            while (files.Count > MaxRetainedScreenshotCount)
+            {
+                var oldest = FindOldestDeletableFile(files, preservedFullPath);
+                if (oldest == null)
+                {
+                    break;
+                }
+
+                TryDeleteFile(oldest.FullName);
+                files.Remove(oldest);
+            }
+
+            var totalBytes = GetTotalBytes(files);
+            while (totalBytes > MaxRetainedScreenshotBytes)
+            {
+                var oldest = FindOldestDeletableFile(files, preservedFullPath);
+                if (oldest == null)
+                {
+                    break;
+                }
+
+                totalBytes -= oldest.Length;
+                TryDeleteFile(oldest.FullName);
+                files.Remove(oldest);
+            }
+        }
+
+        private static List<FileInfo> GetScreenshotFiles(string artifactDirectory)
+        {
+            var files = new List<FileInfo>();
+            foreach (var path in Directory.GetFiles(artifactDirectory, "*.png", SearchOption.TopDirectoryOnly))
+            {
+                files.Add(new FileInfo(path));
+            }
+
+            files.Sort((left, right) =>
+            {
+                var comparison = left.LastWriteTimeUtc.CompareTo(right.LastWriteTimeUtc);
+                return comparison != 0 ? comparison : string.CompareOrdinal(left.FullName, right.FullName);
+            });
+            return files;
+        }
+
+        private static FileInfo FindOldestDeletableFile(List<FileInfo> files, string preservedFullPath)
+        {
+            foreach (var file in files)
+            {
+                if (!IsPreservedFile(file, preservedFullPath))
+                {
+                    return file;
+                }
+            }
+
+            return null;
+        }
+
+        private static long GetTotalBytes(List<FileInfo> files)
+        {
+            long totalBytes = 0;
+            foreach (var file in files)
+            {
+                totalBytes += file.Length;
+            }
+
+            return totalBytes;
         }
 
         private void RequestScreenshot(string path)
@@ -172,6 +307,11 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
 
         private static void TryDeleteTempFile(string path)
         {
+            TryDeleteFile(path);
+        }
+
+        private static void TryDeleteFile(string path)
+        {
             if (string.IsNullOrWhiteSpace(path))
             {
                 return;
@@ -188,6 +328,12 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             {
                 // Ignore cleanup failures.
             }
+        }
+
+        private static bool IsPreservedFile(FileInfo file, string preservedFullPath)
+        {
+            return !string.IsNullOrWhiteSpace(preservedFullPath)
+                && string.Equals(file.FullName, preservedFullPath, StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool TryParseMaxHeight(JToken arguments, out int maxHeight, out string errorMessage)

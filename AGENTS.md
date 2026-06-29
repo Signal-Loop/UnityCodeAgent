@@ -70,5 +70,5 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 
 ## External References
 
-- GitHub Copilot .NET SDK source: `<local copilot-sdk checkout>\\dotnet\\`
-- Unity Code MCP Server source: `<local UnityCodeMcpServer checkout>\\`
+- GitHub Copilot .NET SDK source: `C:\Users\tbory\source\Workspaces\copilot-sdk\dotnet\`
+- Unity Code MCP Server source: `C:\Users\tbory\source\Workspaces\Loop\UnityCodeMcpServer\`
