@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using SignalLoop.UnityCodeAgent.Logging;
@@ -98,6 +98,9 @@ Debug.Log($""Player position: {go.transform.position}"");
             {
                 return compilationBlockedResult;
             }
+
+
+            _log.Debug(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool script:\n{script}");
 
             ScriptExecutionService executionService = new(_context);
             ScriptExecutionService.ExecutionResult result = await executionService.ExecuteScriptAsync(script);
