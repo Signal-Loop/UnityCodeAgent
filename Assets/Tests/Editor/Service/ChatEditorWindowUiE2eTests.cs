@@ -76,6 +76,12 @@ namespace SignalLoop.UnityCodeAgent.UI
         private static ChatEditorWindow FindWindow()
             => Resources.FindObjectsOfTypeAll<ChatEditorWindow>().FirstOrDefault();
 
+        private static string SimpleMockSessionId()
+            => MockSessionData.SimpleSessionId(UnityCodeAgentSettings.GetUnityContext().Paths);
+
+        private static string CodegenMockSessionId()
+            => MockSessionData.CodegenSessionId(UnityCodeAgentSettings.GetUnityContext().Paths);
+
         private static void CloseWindowIfOpen()
         {
             var window = FindWindow();
@@ -347,8 +353,8 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(initialMessages.Count, Is.EqualTo(2),
                 $"Simple mock history should render exactly 2 visible messages, got {initialMessages.Count}");
 
-            EnqueueMockEvent("mock-session-simple", 1, AgentEventType.UserMessage, "How do I get the player's position in Unity?", string.Empty);
-            EnqueueMockEvent("mock-session-simple", 2, AgentEventType.AssistantMessage, "You can get the player's world-space position using `transform.position` on the player's `Transform` component.\n\n```csharp\nVector3 playerPos = playerTransform.position;\n```\n\nIf you need the position in local space (relative to a parent), use `transform.localPosition` instead.", string.Empty);
+            EnqueueMockEvent(SimpleMockSessionId(), 1, AgentEventType.UserMessage, "How do I get the player's position in Unity?", string.Empty);
+            EnqueueMockEvent(SimpleMockSessionId(), 2, AgentEventType.AssistantMessage, "You can get the player's world-space position using `transform.position` on the player's `Transform` component.\n\n```csharp\nVector3 playerPos = playerTransform.position;\n```\n\nIf you need the position in local space (relative to a parent), use `transform.localPosition` instead.", string.Empty);
 
             var deadline = EditorApplication.timeSinceStartup + 0.75d;
             while (EditorApplication.timeSinceStartup < deadline)
@@ -391,7 +397,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(sessionsScrollView.contentContainer.childCount, Is.EqualTo(5),
                 "Should show 5 mock sessions");
 
-            ClickSessionEntry(window, "mock-session-codegen");
+            ClickSessionEntry(window, CodegenMockSessionId());
             yield return WaitForMessageContaining(window, 0, "Create a rotating cube script");
             yield return WaitForMessageCount(window, 3);
 
@@ -449,7 +455,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(sessionsButton.enabledInHierarchy, Is.False,
                 "Sessions button should be disabled while the sessions list is open");
 
-            var sessionName = GetSessionEntryName(window, "mock-session-simple");
+            var sessionName = GetSessionEntryName(window, SimpleMockSessionId());
             Assert.That(sessionName, Is.Not.Null);
             Assert.That(sessionName.Length, Is.EqualTo(63),
                 "Truncated session name should keep the first 60 chars and add '...'");
@@ -469,7 +475,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             var window = FindWindow();
             Assert.That(window, Is.Not.Null);
 
-            EnqueueMockEvent("mock-session-simple", 700, AgentEventType.SessionStatusChanged, "streaming", "busy-marker");
+            EnqueueMockEvent(SimpleMockSessionId(), 700, AgentEventType.SessionStatusChanged, "streaming", "busy-marker");
             yield return WaitUntil(
                 () => window.rootVisualElement.Q<Button>("send-button")?.text == "Stop",
                 "Chat window did not enter a busy state.");
@@ -482,10 +488,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(sendButton.text, Is.EqualTo("Send"),
                 "The composer should remain a send action while the sessions list is open.");
 
-            var entry = GetSessionEntry(window, "mock-session-simple");
+            var entry = GetSessionEntry(window, SimpleMockSessionId());
             Assert.That(entry.ClassListContains("session-entry--unfinished"), Is.True);
 
-            ClickSessionEntry(window, "mock-session-simple");
+            ClickSessionEntry(window, SimpleMockSessionId());
             yield return WaitUntil(
                 () => window.rootVisualElement.Q<ScrollView>("scroll-view")?.style.display.value == DisplayStyle.Flex
                     && window.rootVisualElement.Q<Button>("send-button")?.text == "Send",
@@ -494,7 +500,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             OpenSessionsList(window);
             yield return WaitForSessionsList(window, 5);
 
-            var reopenedEntry = GetSessionEntry(window, "mock-session-simple");
+            var reopenedEntry = GetSessionEntry(window, SimpleMockSessionId());
             Assert.That(reopenedEntry.ClassListContains("session-entry--unfinished"), Is.False);
 
             window.Close();
@@ -529,7 +535,7 @@ namespace SignalLoop.UnityCodeAgent.UI
                 },
                 "Progress message was not replaced in place.");
 
-            EnqueueMockEvent("mock-session-simple", 503, AgentEventType.AssistantMessage, "Progress resolved.", "progress-response");
+            EnqueueMockEvent(SimpleMockSessionId(), 503, AgentEventType.AssistantMessage, "Progress resolved.", "progress-response");
             yield return WaitUntil(
                 () =>
                 {
@@ -559,7 +565,7 @@ namespace SignalLoop.UnityCodeAgent.UI
                 () => GetMessageContents(window).Last() == "Preparing tool output...",
                 "Progress message was not shown before the tool event.");
 
-            EnqueueMockEvent("mock-session-simple", 504, AgentEventType.Tool, "Tool result ready.", "progress-tool-response");
+            EnqueueMockEvent(SimpleMockSessionId(), 504, AgentEventType.Tool, "Tool result ready.", "progress-tool-response");
             yield return WaitUntil(
                 () =>
                 {
@@ -589,7 +595,7 @@ namespace SignalLoop.UnityCodeAgent.UI
                 () => GetMessageContents(window).Last() == "Waiting for stream...",
                 "Progress message was not shown before the streamed delta.");
 
-            EnqueueMockEvent("mock-session-simple", 505, AgentEventType.AssistantDelta, "Stream started.", "progress-delta-response");
+            EnqueueMockEvent(SimpleMockSessionId(), 505, AgentEventType.AssistantDelta, "Stream started.", "progress-delta-response");
             yield return WaitUntil(
                 () =>
                 {
@@ -619,7 +625,7 @@ namespace SignalLoop.UnityCodeAgent.UI
                 () => GetMessageContents(window).Last() == "Waiting for response...",
                 "Progress message was not shown before idle.");
 
-            EnqueueMockEvent("mock-session-simple", 602, AgentEventType.SessionIdle, string.Empty, "progress-idle-test");
+            EnqueueMockEvent(SimpleMockSessionId(), 602, AgentEventType.SessionIdle, string.Empty, "progress-idle-test");
             yield return WaitUntil(
                 () =>
                 {
@@ -644,7 +650,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             var initialCount = GetMessageContents(window).Count;
             var longContent = new string('a', 100) + "tail that should not render";
 
-            EnqueueMockEvent("mock-session-simple", 801, AgentEventType.Tool, longContent, "long-tool-output");
+            EnqueueMockEvent(SimpleMockSessionId(), 801, AgentEventType.Tool, longContent, "long-tool-output");
             yield return WaitUntil(
                 () => GetMessageContents(window).Count == initialCount + 1,
                 "Long tool event was not appended.");
@@ -672,7 +678,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             var longContent = new string('b', 100) + "hidden tail";
 
             EnqueueMockEvent(
-                "mock-session-simple",
+                SimpleMockSessionId(),
                 802,
                 AgentEventType.Tool,
                 longContent,

@@ -24,6 +24,7 @@ namespace SignalLoop.UnityCodeAgent.Service
     {
         private const int EventDeliveryPollDelayMs = 50;
         private const int EventDeliveryMaxAttempts = 80;
+        private static readonly DateTimeOffset TestSessionIdBaseTime = new DateTimeOffset(2026, 6, 30, 1, 0, 0, TimeSpan.Zero);
 
         private static UnityCodeAgentSettings CreateTestSettings()
         {
@@ -58,6 +59,23 @@ namespace SignalLoop.UnityCodeAgent.Service
                 UnityCodeAgentSettings.DefaultToolAssemblyNames,
                 Array.Empty<string>(),
                 string.Empty);
+
+        private static string TestSessionId(int offsetMinutes)
+            => UnityCodeAgentSessionIds.Create(new UnityCodeAgentPaths("C:/UnityProject"), TestSessionIdBaseTime.AddMinutes(offsetMinutes));
+
+        private static string Session1Id => TestSessionId(0);
+
+        private static string Session2Id => TestSessionId(1);
+
+        private static string CreatedSession1Id => TestSessionId(10);
+
+        private static string CreatedSession2Id => TestSessionId(11);
+
+        private static string SimpleMockSessionId(UnityContext context)
+            => MockSessionData.SimpleSessionId(context.Paths);
+
+        private static string CodegenMockSessionId(UnityContext context)
+            => MockSessionData.CodegenSessionId(context.Paths);
 
         private static UnityContext CreateNoModelContext(UnityCodeAgentSettings settings)
             => new UnityContext(
@@ -134,7 +152,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var service = new AgentService(
                 new MockServiceBootstrap(),
                 new MockServiceBootstrap(),
-                (_, currentManifest) => new MockAgentServiceApiClient(currentManifest, MockServiceRuntime.SharedState),
+                (_, currentManifest) => new MockAgentServiceApiClient(currentManifest, context.Paths, MockServiceRuntime.SharedState),
                 (_, currentManifest) => new MockAgentServiceEventStreamClient(currentManifest, MockServiceRuntime.SharedState),
                 _ => manifest);
 
@@ -288,13 +306,15 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(showSessions, Is.Not.Null);
             Assert.That(showSessions.Sessions.Count, Is.EqualTo(5));
 
+            var codegenSessionId = CodegenMockSessionId(context);
+
             // Find the codegen session
             var codegen = showSessions.Sessions
-                .FirstOrDefault(s => s.SessionId == "mock-session-codegen");
+                .FirstOrDefault(s => s.SessionId == codegenSessionId);
             Assert.That(codegen, Is.Not.Null);
 
             // Act 2: open the codegen session
-            var openResult = await client.OpenSessionAsync(context, "mock-session-codegen", CancellationToken.None);
+            var openResult = await client.OpenSessionAsync(context, codegenSessionId, CancellationToken.None);
             Assert.That(openResult.Success, Is.True);
 
             // OpenSessionAsync returns ChatShowMessagesUpdate in result.Updates
@@ -392,7 +412,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var secondSubmit = await client.SubmitPromptAsync(context, "second prompt", CancellationToken.None);
             Assert.That(secondSubmit.Success, Is.True);
-            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { "open:session-1", "send:first prompt", "send:second prompt" }));
+            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { $"open:{Session1Id}", "send:first prompt", "send:second prompt" }));
         }
 
         [Test]
@@ -423,7 +443,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var secondSubmit = await client.SubmitPromptAsync(context, "second prompt", CancellationToken.None);
             Assert.That(secondSubmit.Success, Is.True);
-            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { "open:session-1", "send:first prompt", "send:second prompt" }));
+            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { $"open:{Session1Id}", "send:first prompt", "send:second prompt" }));
         }
 
         [Test]
@@ -452,9 +472,9 @@ namespace SignalLoop.UnityCodeAgent.Service
                 updates.OfType<ChatSetModelLabelUpdate>().Last().ModelLabel,
                 Is.EqualTo("Claude Sonnet 4 (claude-sonnet-4)"));
             Assert.That(harness.ApiOperations.Count, Is.EqualTo(3));
-            Assert.That(harness.ApiOperations[0], Is.EqualTo("open:session-1:gpt-4o"));
-            Assert.That(harness.ApiOperations[1], Is.EqualTo("open:session-1:claude-sonnet-4"));
-            Assert.That(harness.ApiOperations[2], Is.EqualTo("send:session-1:use the new model"));
+            Assert.That(harness.ApiOperations[0], Is.EqualTo($"open:{Session1Id}:gpt-4o"));
+            Assert.That(harness.ApiOperations[1], Is.EqualTo($"open:{Session1Id}:claude-sonnet-4"));
+            Assert.That(harness.ApiOperations[2], Is.EqualTo($"send:{Session1Id}:use the new model"));
         }
 
         [Test]
@@ -478,19 +498,19 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             Assert.That(harness.ApiOperations, Is.EqualTo(new[]
             {
-                "open:session-1:gpt-4o",
+                $"open:{Session1Id}:gpt-4o",
             }));
             Assert.That(
                 updates.OfType<ChatSetModelLabelUpdate>().Last().ModelLabel,
                 Is.EqualTo("Claude Sonnet 4 (claude-sonnet-4)"));
 
-            var openResult = await client.OpenSessionAsync(context, "session-1", CancellationToken.None);
+            var openResult = await client.OpenSessionAsync(context, Session1Id, CancellationToken.None);
             Assert.That(openResult.Success, Is.True);
 
             Assert.That(harness.ApiOperations, Is.EqualTo(new[]
             {
-                "open:session-1:gpt-4o",
-                "open:session-1:claude-sonnet-4",
+                $"open:{Session1Id}:gpt-4o",
+                $"open:{Session1Id}:claude-sonnet-4",
             }));
         }
 
@@ -517,10 +537,10 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(submitResult.Success, Is.True);
 
             Assert.That(harness.ApiOperations.Count, Is.EqualTo(3));
-            Assert.That(harness.ApiOperations[0], Is.EqualTo("open:session-1:gpt-4o"));
+            Assert.That(harness.ApiOperations[0], Is.EqualTo($"open:{Session1Id}:gpt-4o"));
             Assert.That(harness.ApiOperations[1], Does.StartWith("create:"));
             Assert.That(harness.ApiOperations[1], Does.EndWith(":claude-sonnet-4"));
-            Assert.That(harness.ApiOperations[2], Is.EqualTo("send:created-session-1:start with latest model"));
+            Assert.That(harness.ApiOperations[2], Is.EqualTo($"send:{CreatedSession1Id}:start with latest model"));
         }
 
         [Test]
@@ -540,9 +560,9 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(submitResult.Success, Is.True);
 
             Assert.That(harness.ApiOperations.Count, Is.EqualTo(3));
-            Assert.That(harness.ApiOperations[0], Is.EqualTo("open:session-1:gpt-4o:skills=Assets/AgentSkills"));
-            Assert.That(harness.ApiOperations[1], Is.EqualTo("open:session-1:gpt-4o:skills=Assets/AgentSkills:disabled=expensive-skill"));
-            Assert.That(harness.ApiOperations[2], Is.EqualTo("send:session-1:use updated skills"));
+            Assert.That(harness.ApiOperations[0], Is.EqualTo($"open:{Session1Id}:gpt-4o:skills=Assets/AgentSkills"));
+            Assert.That(harness.ApiOperations[1], Is.EqualTo($"open:{Session1Id}:gpt-4o:skills=Assets/AgentSkills:disabled=expensive-skill"));
+            Assert.That(harness.ApiOperations[2], Is.EqualTo($"send:{Session1Id}:use updated skills"));
         }
 
         [Test]
@@ -563,8 +583,8 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             Assert.That(harness.ApiOperations, Is.EqualTo(new[]
             {
-                "open:session-1:gpt-4o",
-                "send:session-1:debug setting changed",
+                $"open:{Session1Id}:gpt-4o",
+                $"send:{Session1Id}:debug setting changed",
             }));
         }
 
@@ -667,7 +687,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(harness.ApiOperations.Count, Is.EqualTo(2));
             Assert.That(harness.ApiOperations[0], Does.StartWith("create:"));
             Assert.That(harness.ApiOperations[0], Does.EndWith(":provider-model:base=https://provider.example/v1"));
-            Assert.That(harness.ApiOperations[1], Is.EqualTo("send:created-session-1:hello provider"));
+            Assert.That(harness.ApiOperations[1], Is.EqualTo($"send:{CreatedSession1Id}:hello provider"));
         }
 
         [Test]
@@ -694,7 +714,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 "Timed out waiting for invalid provider settings to update the model label.");
 
             Assert.That(updates.OfType<ChatSetModelLabelUpdate>().Last().ModelLabel, Is.EqualTo("No model selected"));
-            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { "open:session-1:gpt-4o" }));
+            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { $"open:{Session1Id}:gpt-4o" }));
         }
 
         [Test]
@@ -720,7 +740,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 client.DrainUpdates(context);
             }
 
-            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { "open:session-1:gpt-4o" }));
+            Assert.That(harness.ApiOperations, Is.EqualTo(new[] { $"open:{Session1Id}:gpt-4o" }));
         }
 
         [Test]
@@ -739,7 +759,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var updates = client.DrainUpdates(context);
 
             Assert.That(
-                updates.OfType<ChatShowAgentEventUpdate>().Any(update => update.AgentEvent.SessionId == "session-2"),
+                updates.OfType<ChatShowAgentEventUpdate>().Any(update => update.AgentEvent.SessionId == Session2Id),
                 Is.False);
         }
 
@@ -758,7 +778,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var sessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
             Assert.That(sessionsResult.Success, Is.True);
 
-            harness.Stream.Publish(CreateToolInvocationEnvelope("session-2", "background-call-1"));
+            harness.Stream.Publish(CreateToolInvocationEnvelope(Session2Id, "background-call-1"));
 
             var transcriptUpdates = new List<ChatShowAgentEventUpdate>();
             for (var attempt = 0; attempt < EventDeliveryMaxAttempts && harness.ToolResults.Count == 0; attempt++)
@@ -768,7 +788,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
 
             Assert.That(harness.ToolResults.Count, Is.EqualTo(1), "Expected the background Unity tool request to complete.");
-            Assert.That(harness.ToolResults[0].SessionId, Is.EqualTo("session-2"));
+            Assert.That(harness.ToolResults[0].SessionId, Is.EqualTo(Session2Id));
             Assert.That(harness.ToolResults[0].CallId, Is.EqualTo("background-call-1"));
             Assert.That(harness.ToolResults[0].IsError, Is.True, "The unknown test tool should return an error result, proving the request was executed.");
             Assert.That(transcriptUpdates, Is.Empty, "Background tool events should not be rendered into the visible transcript.");
@@ -791,7 +811,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             harness.Stream.Publish(new AgentServiceEventEnvelope(
                 43,
-                "session-2",
+                Session2Id,
                 DateTimeOffset.UtcNow,
                 "streaming",
                 null,
@@ -807,14 +827,14 @@ namespace SignalLoop.UnityCodeAgent.Service
 
                 var refreshResult = await client.ShowSessionsAsync(context, CancellationToken.None);
                 refreshedSessions = refreshResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
-                if (refreshedSessions.UnfinishedSessionIds.Contains("session-2"))
+                if (refreshedSessions.UnfinishedSessionIds.Contains(Session2Id))
                 {
                     break;
                 }
             }
 
             Assert.That(refreshedSessions, Is.Not.Null);
-            Assert.That(refreshedSessions.UnfinishedSessionIds, Does.Contain("session-2"));
+            Assert.That(refreshedSessions.UnfinishedSessionIds, Does.Contain(Session2Id));
         }
 
         [Test]
@@ -835,7 +855,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var sessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
             Assert.That(sessionsResult.Success, Is.True);
             var showSessions = sessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
-            Assert.That(showSessions.UnfinishedSessionIds, Does.Contain("session-1"));
+            Assert.That(showSessions.UnfinishedSessionIds, Does.Contain(Session1Id));
 
             var secondSubmit = await client.SubmitPromptAsync(context, "start session two", CancellationToken.None);
             Assert.That(secondSubmit.Success, Is.True);
@@ -843,11 +863,11 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(harness.ApiOperations, Is.EqualTo(new[]
             {
                 "list",
-                "open:session-1:ready",
-                "send:session-1:keep session one busy",
+                $"open:{Session1Id}:ready",
+                $"send:{Session1Id}:keep session one busy",
                 "list",
-                "create:created-session-2",
-                "send:created-session-2:start session two",
+                $"create:{CreatedSession2Id}",
+                $"send:{CreatedSession2Id}:start session two",
             }));
         }
 
@@ -897,15 +917,15 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var firstSessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
             var firstShowSessions = firstSessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
-            Assert.That(firstShowSessions.UnfinishedSessionIds, Does.Contain("session-1"));
+            Assert.That(firstShowSessions.UnfinishedSessionIds, Does.Contain(Session1Id));
 
-            var openResult = await client.OpenSessionAsync(context, "session-1", CancellationToken.None);
+            var openResult = await client.OpenSessionAsync(context, Session1Id, CancellationToken.None);
             Assert.That(openResult.Success, Is.True);
             Assert.That(openResult.Updates.OfType<ChatSetBusyStateUpdate>().Last().IsBusy, Is.False);
 
             var secondSessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
             var secondShowSessions = secondSessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
-            Assert.That(secondShowSessions.UnfinishedSessionIds, Does.Not.Contain("session-1"));
+            Assert.That(secondShowSessions.UnfinishedSessionIds, Does.Not.Contain(Session1Id));
         }
 
         [Test]
@@ -920,10 +940,10 @@ namespace SignalLoop.UnityCodeAgent.Service
             var initResult = await client.InitializeAsync(context, CancellationToken.None);
             Assert.That(initResult.Success, Is.True);
 
-            var openSecond = await client.OpenSessionAsync(context, "session-2", CancellationToken.None);
+            var openSecond = await client.OpenSessionAsync(context, Session2Id, CancellationToken.None);
             Assert.That(openSecond.Success, Is.True);
 
-            var reopenFirst = await client.OpenSessionAsync(context, "session-1", CancellationToken.None);
+            var reopenFirst = await client.OpenSessionAsync(context, Session1Id, CancellationToken.None);
             Assert.That(reopenFirst.Success, Is.True);
 
             var showMessages = reopenFirst.Updates.OfType<ChatShowMessagesUpdate>().Single();
@@ -968,9 +988,9 @@ namespace SignalLoop.UnityCodeAgent.Service
                 var service = new AgentService(
                     new MockServiceBootstrap(),
                     new MockServiceBootstrap(),
-                    (_, _) => new StaticOpenApiClient("session-1", "ready", Array.Empty<AgentServiceEventEnvelope>()),
+                    (_, _) => new StaticOpenApiClient(Session1Id, "ready", Array.Empty<AgentServiceEventEnvelope>()),
                     (_, _) => new OneShotEventStreamClient(
-                        new AgentServiceEventEnvelope(20, "session-2", DateTimeOffset.UtcNow, "hidden background message", null, AgentEventType.AssistantMessage, string.Empty, false),
+                        new AgentServiceEventEnvelope(20, Session2Id, DateTimeOffset.UtcNow, "hidden background message", null, AgentEventType.AssistantMessage, string.Empty, false),
                         EventDelivered),
                     _ => _manifest);
 
@@ -1048,15 +1068,15 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
                 => Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
                 {
-                    new SessionSummaryDto("session-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
-                    new SessionSummaryDto("session-2", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session2Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
                 });
 
             public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
                 => Task.FromResult<IReadOnlyList<ModelInfoDto>>(Array.Empty<ModelInfoDto>());
 
             public Task<AgentSessionResponseDto> OpenSessionAsync(OpenAgentSessionRequestDto request, CancellationToken cancellationToken)
-                => Task.FromResult(new AgentSessionResponseDto("session-1", "ready", Array.Empty<AgentServiceEventEnvelope>()));
+                => Task.FromResult(new AgentSessionResponseDto(Session1Id, "ready", Array.Empty<AgentServiceEventEnvelope>()));
 
             public Task<AgentSessionResponseDto> CreateSessionAsync(CreateAgentSessionRequestDto request, CancellationToken cancellationToken)
                 => Task.FromResult(new AgentSessionResponseDto(request.SessionId, "ready", Array.Empty<AgentServiceEventEnvelope>()));
@@ -1181,8 +1201,8 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _apiOperations.Add("list");
                 return Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
                 {
-                    new SessionSummaryDto("session-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
-                    new SessionSummaryDto("session-2", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session2Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
                 });
             }
 
@@ -1192,13 +1212,13 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<AgentSessionResponseDto> OpenSessionAsync(OpenAgentSessionRequestDto request, CancellationToken cancellationToken)
             {
                 _apiOperations.Add($"open:{request.SessionId}:ready");
-                return Task.FromResult(new AgentSessionResponseDto("session-1", "ready", Array.Empty<AgentServiceEventEnvelope>()));
+                return Task.FromResult(new AgentSessionResponseDto(Session1Id, "ready", Array.Empty<AgentServiceEventEnvelope>()));
             }
 
             public Task<AgentSessionResponseDto> CreateSessionAsync(CreateAgentSessionRequestDto request, CancellationToken cancellationToken)
             {
-                _apiOperations.Add("create:created-session-2");
-                return Task.FromResult(new AgentSessionResponseDto("created-session-2", "ready", Array.Empty<AgentServiceEventEnvelope>()));
+                _apiOperations.Add($"create:{CreatedSession2Id}");
+                return Task.FromResult(new AgentSessionResponseDto(CreatedSession2Id, "ready", Array.Empty<AgentServiceEventEnvelope>()));
             }
 
             public Task SendPromptAsync(SendAgentPromptRequestDto request, CancellationToken cancellationToken)
@@ -1224,8 +1244,8 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
                 => Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
                 {
-                    new SessionSummaryDto("session-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
-                    new SessionSummaryDto("session-2", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session2Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
                 });
 
             public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
@@ -1233,17 +1253,17 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             public Task<AgentSessionResponseDto> OpenSessionAsync(OpenAgentSessionRequestDto request, CancellationToken cancellationToken)
             {
-                if (request.SessionId == "session-1")
+                if (request.SessionId == Session1Id)
                 {
                     _session1OpenCount++;
                     if (_session1OpenCount > 1)
                     {
                         return Task.FromResult(new AgentSessionResponseDto(
-                            "session-1",
+                            Session1Id,
                             "streaming",
                             new[]
                             {
-                                new AgentServiceEventEnvelope(30, "session-1", DateTimeOffset.UtcNow, "background response persisted", null, AgentEventType.AssistantMessage, string.Empty, false),
+                                new AgentServiceEventEnvelope(30, Session1Id, DateTimeOffset.UtcNow, "background response persisted", null, AgentEventType.AssistantMessage, string.Empty, false),
                             }));
                     }
                 }
@@ -1332,7 +1352,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
                 => Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
                 {
-                    new SessionSummaryDto("session-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
                 });
 
             public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
@@ -1416,7 +1436,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
                 => Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
                 {
-                    new SessionSummaryDto("session-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
                 });
 
             public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
@@ -1477,7 +1497,7 @@ namespace SignalLoop.UnityCodeAgent.Service
         private static AgentServiceEventEnvelope CreateIdleEvent()
             => new AgentServiceEventEnvelope(
                 10,
-                "session-1",
+                Session1Id,
                 DateTimeOffset.UtcNow,
                 "idle",
                 null,
@@ -1531,7 +1551,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
                 => Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
                 {
-                    new SessionSummaryDto("session-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
                 });
 
             public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
@@ -1546,7 +1566,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             public Task<AgentSessionResponseDto> CreateSessionAsync(CreateAgentSessionRequestDto request, CancellationToken cancellationToken)
             {
                 _apiOperations.Add(FormatOperation("create", request.SessionId, request.Provider, request.SkillDirectories, request.DisabledSkills));
-                return Task.FromResult(new AgentSessionResponseDto("created-session-1", "ready", Array.Empty<AgentServiceEventEnvelope>()));
+                return Task.FromResult(new AgentSessionResponseDto(CreatedSession1Id, "ready", Array.Empty<AgentServiceEventEnvelope>()));
             }
 
             public Task SendPromptAsync(SendAgentPromptRequestDto request, CancellationToken cancellationToken)

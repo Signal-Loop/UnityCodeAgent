@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -35,7 +36,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 new ServiceBootstrap(),
                 CreateMockBootstrap(),
                 (context, manifest) => context.MockAgentService
-                    ? CreateMockApiClient(manifest)
+                    ? CreateMockApiClient(manifest, context.Paths)
                     : new HttpAgentServiceApiClient(manifest),
                 (context, manifest) => context.MockAgentService
                     ? CreateMockEventStreamClient(manifest)
@@ -64,8 +65,8 @@ namespace SignalLoop.UnityCodeAgent.Service
         private static IServiceBootstrap CreateMockBootstrap()
             => new MockServiceBootstrap();
 
-        private static IAgentServiceApiClient CreateMockApiClient(EndpointManifest manifest)
-            => new MockAgentServiceApiClient(manifest);
+        private static IAgentServiceApiClient CreateMockApiClient(EndpointManifest manifest, UnityCodeAgentPaths paths)
+            => new MockAgentServiceApiClient(manifest, paths);
 
         private static IAgentServiceEventStreamClient CreateMockEventStreamClient(EndpointManifest manifest)
             => new MockAgentServiceEventStreamClient(manifest);
@@ -246,9 +247,10 @@ namespace SignalLoop.UnityCodeAgent.Service
                 sessions = await _apiClientFactory(context, restartedManifest).GetSessionsAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            _log.Debug(nameof(AgentService), $"GetSessionsAsync result sessions={sessions.Count}");
+            var filteredSessions = FilterProjectSessions(context, sessions);
+            _log.Debug(nameof(AgentService), $"GetSessionsAsync result sessions={filteredSessions.Count} unfilteredSessions={sessions.Count}");
             _log.Trace(nameof(AgentService), $"GetSessionsAsync completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
-            return sessions;
+            return filteredSessions;
         }
 
         public async Task<AgentSessionResponseDto> GetCurrentSessionAsync(UnityContext context, CancellationToken cancellationToken = default)
@@ -496,7 +498,7 @@ namespace SignalLoop.UnityCodeAgent.Service
         {
             _log.Debug(nameof(AgentService), $"OpenCurrentSessionAsync using manifest port={manifest.Port} serviceProcessId={manifest.ServiceProcessId}");
             var client = _apiClientFactory(context, manifest);
-            var sessions = await client.GetSessionsAsync(cancellationToken).ConfigureAwait(false);
+            var sessions = FilterProjectSessions(context, await client.GetSessionsAsync(cancellationToken).ConfigureAwait(false));
             if (sessions.Count == 0)
             {
                 throw new InvalidOperationException("Copilot service snapshot did not contain any sessions.");
@@ -627,12 +629,16 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
         }
 
-        private static string CreateSessionId(UnityCodeAgentPaths paths, DateTimeOffset timestampUtc)
+        private static IReadOnlyList<SessionSummaryDto> FilterProjectSessions(UnityContext context, IReadOnlyList<SessionSummaryDto> sessions)
         {
-            return string.IsNullOrWhiteSpace(paths.SafeProjectRoot)
-                ? $"UnityCodeAgentSession-{timestampUtc:yyyyMMddHHmmssfff}"
-                : $"UnityCodeAgentSession-{timestampUtc:yyyyMMddHHmmssfff}-{paths.SafeProjectRoot}";
+            return sessions
+                .Where(session => UnityCodeAgentSessionIds.TryParse(session.SessionId, out var parsed)
+                    && string.Equals(parsed.SanitizedProjectRoot, context.Paths.SanitizedProjectRoot, StringComparison.Ordinal))
+                .ToArray();
         }
+
+        private static string CreateSessionId(UnityCodeAgentPaths paths, DateTimeOffset timestampUtc)
+            => UnityCodeAgentSessionIds.Create(paths, timestampUtc);
 
         private static EndpointManifest LoadManifest(UnityContext context)
         {

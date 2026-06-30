@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.RegularExpressions;
 
@@ -13,7 +13,7 @@ namespace SignalLoop.UnityCodeAgent.Infrastructure
         public UnityCodeAgentPaths(string projectRoot)
         {
             ProjectRoot = NormalizeProjectRoot(projectRoot);
-            SafeProjectRoot = CreateSafeProjectRoot(ProjectRoot);
+            SanitizedProjectRoot = SanitizeProjectRoot(ProjectRoot);
             AppRoot = Combine(ProjectRoot, ".unityCodeAgent");
             ClientRoot = Combine(AppRoot, "client");
             ServiceRoot = Combine(AppRoot, "service");
@@ -26,7 +26,7 @@ namespace SignalLoop.UnityCodeAgent.Infrastructure
 
         public string ProjectRoot { get; }
 
-        public string SafeProjectRoot { get; }
+        public string SanitizedProjectRoot { get; }
 
         public string AppRoot { get; }
 
@@ -91,7 +91,7 @@ namespace SignalLoop.UnityCodeAgent.Infrastructure
             return Path.GetFullPath(projectRoot).Replace('\\', '/').TrimEnd('/');
         }
 
-        private static string CreateSafeProjectRoot(string value)
+        private static string SanitizeProjectRoot(string value)
             => Regex.Replace(value, "[^A-Za-z0-9]", "_");
 
         private static string Combine(string left, string right) => $"{left}/{right}";
