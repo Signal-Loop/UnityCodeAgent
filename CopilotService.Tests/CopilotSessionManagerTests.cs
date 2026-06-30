@@ -93,7 +93,7 @@ public sealed class CopilotSessionManagerTests
     }
 
     [Test]
-    [Description("Goal: prove prompt-send auth failures on BYOK sessions keep BYOK-specific guidance and redact the configured API key. Scope: CopilotSessionManager exception translation only. Boundaries: excludes live provider calls and endpoint serialization.")]
+    [Description("Goal: prove prompt-send auth failures on BYOK sessions keep BYOK provider guidance and redact the configured API key. Scope: CopilotSessionManager exception translation only. Boundaries: excludes live provider calls and endpoint serialization.")]
     public async Task SendAsync_ByokAuthFailure_ThrowsByokGuidanceWithoutApiKey()
     {
         var host = new FakeRuntimeHost();
@@ -107,7 +107,9 @@ public sealed class CopilotSessionManagerTests
             await manager.SendAsync(new SendAgentPromptRequestDto("session-1", "hello"), CancellationToken.None));
 
         Assert.That(exception, Is.Not.Null);
-        Assert.That(exception!.Message, Does.Contain("BYOK provider authentication failed."));
+        Assert.That(exception!.Message, Does.Contain("BYOK provider request failed."));
+        Assert.That(exception.Message, Does.Contain("BaseUrl"));
+        Assert.That(exception.Message, Does.Contain("selected model"));
         Assert.That(exception.Message, Does.Not.Contain("401 Unauthorized"));
         Assert.That(exception.Message, Does.Not.Contain("secret-test-key"));
         Assert.That(exception.Message, Does.Not.Contain("Details:"));
@@ -149,8 +151,9 @@ public sealed class CopilotSessionManagerTests
             await manager.SendAsync(new SendAgentPromptRequestDto("session-1", "hello"), CancellationToken.None));
 
         Assert.That(exception, Is.Not.Null);
-        Assert.That(exception!.Message, Does.Contain("BYOK provider authentication failed."));
-        Assert.That(exception.Message, Does.Not.Contain("provider request failed"));
+        Assert.That(exception!.Message, Does.Contain("BYOK provider request failed."));
+        Assert.That(exception.Message, Does.Contain("BaseUrl"));
+        Assert.That(exception.Message, Does.Contain("selected model"));
         Assert.That(exception.InnerException, Is.TypeOf<HttpRequestException>());
     }
 

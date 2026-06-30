@@ -53,7 +53,7 @@ public sealed class ServiceEventEnvelopeFactoryTests
         var envelope = ServiceEventEnvelopeFactory.Create(1, "session-1", CreateToolExecutionCompleteEvent());
 
         Assert.That(envelope, Is.Not.Null);
-        Assert.That(envelope!.Content, Is.EqualTo("Result: 'Getting Unity info'"));
+        Assert.That(envelope!.Content, Is.EqualTo("Result: Getting Unity info"));
         Assert.That(envelope.StreamKey, Is.EqualTo("tool:call-1"));
     }
 

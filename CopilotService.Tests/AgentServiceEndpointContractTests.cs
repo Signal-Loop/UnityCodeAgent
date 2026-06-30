@@ -169,7 +169,7 @@ public sealed class AgentServiceEndpointContractTests
     }
 
     [Test]
-    [Description("Goal: verify BYOK auth failures return provider-settings guidance without leaking the configured API key. Scope: endpoint error translation only with a fake session service. Boundaries: excludes live provider calls and Unity settings drawing.")]
+    [Description("Goal: verify BYOK auth failures return provider request guidance without leaking the configured API key. Scope: endpoint error translation only with a fake session service. Boundaries: excludes live provider calls and Unity settings drawing.")]
     public async Task CreateSession_ByokAuthFailure_ReturnsByokGuidanceWithoutApiKey()
     {
         await using var factory = new AgentServiceApplicationFactory();
@@ -195,8 +195,9 @@ public sealed class AgentServiceEndpointContractTests
         var error = JsonConvert.DeserializeObject<AgentServiceErrorResponse>(body);
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
-        Assert.That(error?.Message, Does.Contain("BYOK provider authentication failed."));
-        Assert.That(error?.Message, Does.Contain("BaseUrl and ApiKey"));
+        Assert.That(error?.Message, Does.Contain("BYOK provider request failed."));
+        Assert.That(error?.Message, Does.Contain("BaseUrl"));
+        Assert.That(error?.Message, Does.Contain("selected model"));
         Assert.That(error?.Message, Does.Not.Contain("secret-test-key"));
         Assert.That(error?.Message, Does.Not.Contain("403 Forbidden"));
         Assert.That(error?.Message, Does.Not.Contain("Details:"));
