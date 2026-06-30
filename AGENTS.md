@@ -56,6 +56,7 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 
 - For Unity/editor changes, prefer Unity EditMode tests, Unity console logs, and targeted `execute_csharp_script_in_unity_editor` checks.
 - For service changes, prefer focused `dotnet test` runs in `CopilotService.Tests`.
+- When running Codex skill validation scripts that import `yaml`, use `uv run --with pyyaml ...` instead of the ambient Python interpreter.
 - When the local `UnityCodeCopilot.Service` process may already be running, run service tests with an isolated artifact path so the build does not try to overwrite the live exe:
   `dotnet test CopilotService.Tests\UnityCodeCopilot.Service.Tests.csproj --artifacts-path .artifacts\copilot-service-tests -p:UseAppHost=false`
 - The contract-spec tests resolve `contracts/openapi/agent-service.openapi.yaml` and `contracts/asyncapi/agent-service-events.asyncapi.yaml` relative to the artifact root, so those files must also be available under `.artifacts\contracts\...` when using the artifact-path workflow.
