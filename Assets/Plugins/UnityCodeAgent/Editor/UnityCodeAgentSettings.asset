@@ -26,20 +26,696 @@ MonoBehaviour:
   MockAgentService: 0
   AdditionalToolAssemblyNames: []
   InputActionsAssetPath: 
-  ProviderType: 0
+  ProviderType: 1
   ByokBaseUrl: https://openrouter.ai/api/v1
   Skills:
     _folders:
     - .agents/skills
-    _disabledSkills: []
+    _disabledSkills:
+    - copilot-sdk
+    - create-release
+    - kanban-task-workflow
+    - project-python
     _defaultsInitialized: 1
   SkillsInstallTarget: 2
   SkillsTargetPath: .agents/skills
   _hasInitializedSkillsInstallTarget: 1
   Model:
-    Id: auto
-    Name: Auto
+    Id: deepseek/deepseek-v4-flash
+    Name: 'DeepSeek: DeepSeek V4 Flash'
   AvailableModels:
-  - Id: auto
-    Name: Auto
-  AvailableModelsBaseUrl: 
+  - Id: ai21/jamba-large-1.7
+    Name: 'AI21: Jamba Large 1.7'
+  - Id: aion-labs/aion-1.0
+    Name: 'AionLabs: Aion-1.0'
+  - Id: aion-labs/aion-1.0-mini
+    Name: 'AionLabs: Aion-1.0-Mini'
+  - Id: aion-labs/aion-2.0
+    Name: 'AionLabs: Aion-2.0'
+  - Id: aion-labs/aion-rp-llama-3.1-8b
+    Name: 'AionLabs: Aion-RP 1.0 (8B)'
+  - Id: allenai/olmo-3-32b-think
+    Name: 'AllenAI: Olmo 3 32B Think'
+  - Id: amazon/nova-2-lite-v1
+    Name: 'Amazon: Nova 2 Lite'
+  - Id: amazon/nova-lite-v1
+    Name: 'Amazon: Nova Lite 1.0'
+  - Id: amazon/nova-micro-v1
+    Name: 'Amazon: Nova Micro 1.0'
+  - Id: amazon/nova-premier-v1
+    Name: 'Amazon: Nova Premier 1.0'
+  - Id: amazon/nova-pro-v1
+    Name: 'Amazon: Nova Pro 1.0'
+  - Id: ~anthropic/claude-haiku-latest
+    Name: Anthropic Claude Haiku Latest
+  - Id: ~anthropic/claude-sonnet-latest
+    Name: Anthropic Claude Sonnet Latest
+  - Id: anthropic/claude-3-haiku
+    Name: 'Anthropic: Claude 3 Haiku'
+  - Id: anthropic/claude-fable-5
+    Name: 'Anthropic: Claude Fable 5'
+  - Id: ~anthropic/claude-fable-latest
+    Name: 'Anthropic: Claude Fable Latest'
+  - Id: anthropic/claude-haiku-4.5
+    Name: 'Anthropic: Claude Haiku 4.5'
+  - Id: anthropic/claude-opus-4
+    Name: 'Anthropic: Claude Opus 4'
+  - Id: anthropic/claude-opus-4.1
+    Name: 'Anthropic: Claude Opus 4.1'
+  - Id: anthropic/claude-opus-4.5
+    Name: 'Anthropic: Claude Opus 4.5'
+  - Id: anthropic/claude-opus-4.6
+    Name: 'Anthropic: Claude Opus 4.6'
+  - Id: anthropic/claude-opus-4.7
+    Name: 'Anthropic: Claude Opus 4.7'
+  - Id: anthropic/claude-opus-4.7-fast
+    Name: 'Anthropic: Claude Opus 4.7 (Fast)'
+  - Id: anthropic/claude-opus-4.8
+    Name: 'Anthropic: Claude Opus 4.8'
+  - Id: anthropic/claude-opus-4.8-fast
+    Name: 'Anthropic: Claude Opus 4.8 (Fast)'
+  - Id: ~anthropic/claude-opus-latest
+    Name: 'Anthropic: Claude Opus Latest'
+  - Id: anthropic/claude-sonnet-4
+    Name: 'Anthropic: Claude Sonnet 4'
+  - Id: anthropic/claude-sonnet-4.5
+    Name: 'Anthropic: Claude Sonnet 4.5'
+  - Id: anthropic/claude-sonnet-4.6
+    Name: 'Anthropic: Claude Sonnet 4.6'
+  - Id: arcee-ai/coder-large
+    Name: 'Arcee AI: Coder Large'
+  - Id: arcee-ai/trinity-large-thinking
+    Name: 'Arcee AI: Trinity Large Thinking'
+  - Id: arcee-ai/trinity-mini
+    Name: 'Arcee AI: Trinity Mini'
+  - Id: arcee-ai/virtuoso-large
+    Name: 'Arcee AI: Virtuoso Large'
+  - Id: openrouter/auto
+    Name: Auto Router
+  - Id: baidu/ernie-4.5-vl-424b-a47b
+    Name: 'Baidu: ERNIE 4.5 VL 424B A47B'
+  - Id: openrouter/bodybuilder
+    Name: Body Builder (beta)
+  - Id: bytedance-seed/seed-1.6
+    Name: 'ByteDance Seed: Seed 1.6'
+  - Id: bytedance-seed/seed-1.6-flash
+    Name: 'ByteDance Seed: Seed 1.6 Flash'
+  - Id: bytedance-seed/seed-2.0-lite
+    Name: 'ByteDance Seed: Seed-2.0-Lite'
+  - Id: bytedance-seed/seed-2.0-mini
+    Name: 'ByteDance Seed: Seed-2.0-Mini'
+  - Id: bytedance/ui-tars-1.5-7b
+    Name: 'ByteDance: UI-TARS 7B'
+  - Id: cohere/command-a
+    Name: 'Cohere: Command A'
+  - Id: cohere/command-r-08-2024
+    Name: 'Cohere: Command R (08-2024)'
+  - Id: cohere/command-r-plus-08-2024
+    Name: 'Cohere: Command R+ (08-2024)'
+  - Id: cohere/command-r7b-12-2024
+    Name: 'Cohere: Command R7B (12-2024)'
+  - Id: cohere/north-mini-code:free
+    Name: 'Cohere: North Mini Code (free)'
+  - Id: deepcogito/cogito-v2.1-671b
+    Name: 'Deep Cogito: Cogito v2.1 671B'
+  - Id: deepseek/deepseek-chat
+    Name: 'DeepSeek: DeepSeek V3'
+  - Id: deepseek/deepseek-chat-v3-0324
+    Name: 'DeepSeek: DeepSeek V3 0324'
+  - Id: deepseek/deepseek-chat-v3.1
+    Name: 'DeepSeek: DeepSeek V3.1'
+  - Id: deepseek/deepseek-v3.1-terminus
+    Name: 'DeepSeek: DeepSeek V3.1 Terminus'
+  - Id: deepseek/deepseek-v3.2
+    Name: 'DeepSeek: DeepSeek V3.2'
+  - Id: deepseek/deepseek-v3.2-exp
+    Name: 'DeepSeek: DeepSeek V3.2 Exp'
+  - Id: deepseek/deepseek-v4-flash
+    Name: 'DeepSeek: DeepSeek V4 Flash'
+  - Id: deepseek/deepseek-v4-pro
+    Name: 'DeepSeek: DeepSeek V4 Pro'
+  - Id: deepseek/deepseek-r1
+    Name: 'DeepSeek: R1'
+  - Id: deepseek/deepseek-r1-0528
+    Name: 'DeepSeek: R1 0528'
+  - Id: deepseek/deepseek-r1-distill-llama-70b
+    Name: 'DeepSeek: R1 Distill Llama 70B'
+  - Id: openrouter/free
+    Name: Free Models Router
+  - Id: ~google/gemini-flash-latest
+    Name: Google Gemini Flash Latest
+  - Id: ~google/gemini-pro-latest
+    Name: Google Gemini Pro Latest
+  - Id: google/gemini-2.5-flash
+    Name: 'Google: Gemini 2.5 Flash'
+  - Id: google/gemini-2.5-flash-lite
+    Name: 'Google: Gemini 2.5 Flash Lite'
+  - Id: google/gemini-2.5-flash-lite-preview-09-2025
+    Name: 'Google: Gemini 2.5 Flash Lite Preview 09-2025'
+  - Id: google/gemini-2.5-pro
+    Name: 'Google: Gemini 2.5 Pro'
+  - Id: google/gemini-2.5-pro-preview-05-06
+    Name: 'Google: Gemini 2.5 Pro Preview 05-06'
+  - Id: google/gemini-2.5-pro-preview
+    Name: 'Google: Gemini 2.5 Pro Preview 06-05'
+  - Id: google/gemini-3-flash-preview
+    Name: 'Google: Gemini 3 Flash Preview'
+  - Id: google/gemini-3.1-flash-lite
+    Name: 'Google: Gemini 3.1 Flash Lite'
+  - Id: google/gemini-3.1-flash-lite-preview
+    Name: 'Google: Gemini 3.1 Flash Lite Preview'
+  - Id: google/gemini-3.1-pro-preview
+    Name: 'Google: Gemini 3.1 Pro Preview'
+  - Id: google/gemini-3.1-pro-preview-customtools
+    Name: 'Google: Gemini 3.1 Pro Preview Custom Tools'
+  - Id: google/gemini-3.5-flash
+    Name: 'Google: Gemini 3.5 Flash'
+  - Id: google/gemma-2-27b-it
+    Name: 'Google: Gemma 2 27B'
+  - Id: google/gemma-3-12b-it
+    Name: 'Google: Gemma 3 12B'
+  - Id: google/gemma-3-27b-it
+    Name: 'Google: Gemma 3 27B'
+  - Id: google/gemma-3-4b-it
+    Name: 'Google: Gemma 3 4B'
+  - Id: google/gemma-3n-e4b-it
+    Name: 'Google: Gemma 3n 4B'
+  - Id: google/gemma-4-26b-a4b-it
+    Name: 'Google: Gemma 4 26B A4B'
+  - Id: google/gemma-4-26b-a4b-it:free
+    Name: 'Google: Gemma 4 26B A4B  (free)'
+  - Id: google/gemma-4-31b-it
+    Name: 'Google: Gemma 4 31B'
+  - Id: google/gemma-4-31b-it:free
+    Name: 'Google: Gemma 4 31B (free)'
+  - Id: google/lyria-3-clip-preview
+    Name: 'Google: Lyria 3 Clip Preview'
+  - Id: google/lyria-3-pro-preview
+    Name: 'Google: Lyria 3 Pro Preview'
+  - Id: google/gemini-2.5-flash-image
+    Name: 'Google: Nano Banana (Gemini 2.5 Flash Image)'
+  - Id: google/gemini-3.1-flash-image-preview
+    Name: 'Google: Nano Banana 2 (Gemini 3.1 Flash Image Preview)'
+  - Id: google/gemini-3.1-flash-image
+    Name: 'Google: Nano Banana 2 (Gemini 3.1 Flash Image)'
+  - Id: google/gemini-3-pro-image-preview
+    Name: 'Google: Nano Banana Pro (Gemini 3 Pro Image Preview)'
+  - Id: google/gemini-3-pro-image
+    Name: 'Google: Nano Banana Pro (Gemini 3 Pro Image)'
+  - Id: ibm-granite/granite-4.0-h-micro
+    Name: 'IBM: Granite 4.0 Micro'
+  - Id: ibm-granite/granite-4.1-8b
+    Name: 'IBM: Granite 4.1 8B'
+  - Id: inception/mercury-2
+    Name: 'Inception: Mercury 2'
+  - Id: inflection/inflection-3-pi
+    Name: 'Inflection: Inflection 3 Pi'
+  - Id: inflection/inflection-3-productivity
+    Name: 'Inflection: Inflection 3 Productivity'
+  - Id: kwaipilot/kat-coder-pro-v2
+    Name: 'Kwaipilot: KAT-Coder-Pro V2'
+  - Id: liquid/lfm-2-24b-a2b
+    Name: 'LiquidAI: LFM2-24B-A2B'
+  - Id: liquid/lfm-2.5-1.2b-instruct:free
+    Name: 'LiquidAI: LFM2.5-1.2B-Instruct (free)'
+  - Id: liquid/lfm-2.5-1.2b-thinking:free
+    Name: 'LiquidAI: LFM2.5-1.2B-Thinking (free)'
+  - Id: anthracite-org/magnum-v4-72b
+    Name: Magnum v4 72B
+  - Id: mancer/weaver
+    Name: 'Mancer: Weaver (alpha)'
+  - Id: meta-llama/llama-3-8b-instruct
+    Name: 'Meta: Llama 3 8B Instruct'
+  - Id: meta-llama/llama-3.1-70b-instruct
+    Name: 'Meta: Llama 3.1 70B Instruct'
+  - Id: meta-llama/llama-3.1-8b-instruct
+    Name: 'Meta: Llama 3.1 8B Instruct'
+  - Id: meta-llama/llama-3.2-11b-vision-instruct
+    Name: 'Meta: Llama 3.2 11B Vision Instruct'
+  - Id: meta-llama/llama-3.2-1b-instruct
+    Name: 'Meta: Llama 3.2 1B Instruct'
+  - Id: meta-llama/llama-3.2-3b-instruct
+    Name: 'Meta: Llama 3.2 3B Instruct'
+  - Id: meta-llama/llama-3.2-3b-instruct:free
+    Name: 'Meta: Llama 3.2 3B Instruct (free)'
+  - Id: meta-llama/llama-3.3-70b-instruct
+    Name: 'Meta: Llama 3.3 70B Instruct'
+  - Id: meta-llama/llama-3.3-70b-instruct:free
+    Name: 'Meta: Llama 3.3 70B Instruct (free)'
+  - Id: meta-llama/llama-4-maverick
+    Name: 'Meta: Llama 4 Maverick'
+  - Id: meta-llama/llama-4-scout
+    Name: 'Meta: Llama 4 Scout'
+  - Id: meta-llama/llama-guard-4-12b
+    Name: 'Meta: Llama Guard 4 12B'
+  - Id: microsoft/phi-4
+    Name: 'Microsoft: Phi 4'
+  - Id: microsoft/phi-4-mini-instruct
+    Name: 'Microsoft: Phi 4 Mini Instruct'
+  - Id: minimax/minimax-m1
+    Name: 'MiniMax: MiniMax M1'
+  - Id: minimax/minimax-m2
+    Name: 'MiniMax: MiniMax M2'
+  - Id: minimax/minimax-m2-her
+    Name: 'MiniMax: MiniMax M2-her'
+  - Id: minimax/minimax-m2.1
+    Name: 'MiniMax: MiniMax M2.1'
+  - Id: minimax/minimax-m2.5
+    Name: 'MiniMax: MiniMax M2.5'
+  - Id: minimax/minimax-m2.7
+    Name: 'MiniMax: MiniMax M2.7'
+  - Id: minimax/minimax-m3
+    Name: 'MiniMax: MiniMax M3'
+  - Id: minimax/minimax-01
+    Name: 'MiniMax: MiniMax-01'
+  - Id: mistralai/mistral-large
+    Name: Mistral Large
+  - Id: mistralai/mistral-large-2407
+    Name: Mistral Large 2407
+  - Id: mistralai/codestral-2508
+    Name: 'Mistral: Codestral 2508'
+  - Id: mistralai/devstral-2512
+    Name: 'Mistral: Devstral 2 2512'
+  - Id: mistralai/ministral-14b-2512
+    Name: 'Mistral: Ministral 3 14B 2512'
+  - Id: mistralai/ministral-3b-2512
+    Name: 'Mistral: Ministral 3 3B 2512'
+  - Id: mistralai/ministral-8b-2512
+    Name: 'Mistral: Ministral 3 8B 2512'
+  - Id: mistralai/mistral-large-2512
+    Name: 'Mistral: Mistral Large 3 2512'
+  - Id: mistralai/mistral-medium-3
+    Name: 'Mistral: Mistral Medium 3'
+  - Id: mistralai/mistral-medium-3.1
+    Name: 'Mistral: Mistral Medium 3.1'
+  - Id: mistralai/mistral-medium-3-5
+    Name: 'Mistral: Mistral Medium 3.5'
+  - Id: mistralai/mistral-nemo
+    Name: 'Mistral: Mistral Nemo'
+  - Id: mistralai/mistral-small-24b-instruct-2501
+    Name: 'Mistral: Mistral Small 3'
+  - Id: mistralai/mistral-small-3.1-24b-instruct
+    Name: 'Mistral: Mistral Small 3.1 24B'
+  - Id: mistralai/mistral-small-3.2-24b-instruct
+    Name: 'Mistral: Mistral Small 3.2 24B'
+  - Id: mistralai/mistral-small-2603
+    Name: 'Mistral: Mistral Small 4'
+  - Id: mistralai/mixtral-8x22b-instruct
+    Name: 'Mistral: Mixtral 8x22B Instruct'
+  - Id: mistralai/mistral-saba
+    Name: 'Mistral: Saba'
+  - Id: mistralai/voxtral-small-24b-2507
+    Name: 'Mistral: Voxtral Small 24B 2507'
+  - Id: ~moonshotai/kimi-latest
+    Name: MoonshotAI Kimi Latest
+  - Id: moonshotai/kimi-k2
+    Name: 'MoonshotAI: Kimi K2 0711'
+  - Id: moonshotai/kimi-k2-0905
+    Name: 'MoonshotAI: Kimi K2 0905'
+  - Id: moonshotai/kimi-k2-thinking
+    Name: 'MoonshotAI: Kimi K2 Thinking'
+  - Id: moonshotai/kimi-k2.5
+    Name: 'MoonshotAI: Kimi K2.5'
+  - Id: moonshotai/kimi-k2.6
+    Name: 'MoonshotAI: Kimi K2.6'
+  - Id: moonshotai/kimi-k2.7-code
+    Name: 'MoonshotAI: Kimi K2.7 Code'
+  - Id: morph/morph-v3-fast
+    Name: 'Morph: Morph V3 Fast'
+  - Id: morph/morph-v3-large
+    Name: 'Morph: Morph V3 Large'
+  - Id: gryphe/mythomax-l2-13b
+    Name: MythoMax 13B
+  - Id: nvidia/llama-3.3-nemotron-super-49b-v1.5
+    Name: 'NVIDIA: Llama 3.3 Nemotron Super 49B V1.5'
+  - Id: nvidia/nemotron-3-nano-30b-a3b
+    Name: 'NVIDIA: Nemotron 3 Nano 30B A3B'
+  - Id: nvidia/nemotron-3-nano-30b-a3b:free
+    Name: 'NVIDIA: Nemotron 3 Nano 30B A3B (free)'
+  - Id: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+    Name: 'NVIDIA: Nemotron 3 Nano Omni (free)'
+  - Id: nvidia/nemotron-3-super-120b-a12b
+    Name: 'NVIDIA: Nemotron 3 Super'
+  - Id: nvidia/nemotron-3-super-120b-a12b:free
+    Name: 'NVIDIA: Nemotron 3 Super (free)'
+  - Id: nvidia/nemotron-3-ultra-550b-a55b
+    Name: 'NVIDIA: Nemotron 3 Ultra'
+  - Id: nvidia/nemotron-3-ultra-550b-a55b:free
+    Name: 'NVIDIA: Nemotron 3 Ultra (free)'
+  - Id: nvidia/nemotron-3.5-content-safety:free
+    Name: 'NVIDIA: Nemotron 3.5 Content Safety (free)'
+  - Id: nvidia/nemotron-nano-12b-v2-vl:free
+    Name: 'NVIDIA: Nemotron Nano 12B 2 VL (free)'
+  - Id: nvidia/nemotron-nano-9b-v2:free
+    Name: 'NVIDIA: Nemotron Nano 9B V2 (free)'
+  - Id: nex-agi/nex-n2-pro
+    Name: 'Nex AGI: Nex-N2-Pro'
+  - Id: nousresearch/hermes-3-llama-3.1-405b
+    Name: 'Nous: Hermes 3 405B Instruct'
+  - Id: nousresearch/hermes-3-llama-3.1-405b:free
+    Name: 'Nous: Hermes 3 405B Instruct (free)'
+  - Id: nousresearch/hermes-3-llama-3.1-70b
+    Name: 'Nous: Hermes 3 70B Instruct'
+  - Id: nousresearch/hermes-4-405b
+    Name: 'Nous: Hermes 4 405B'
+  - Id: nousresearch/hermes-4-70b
+    Name: 'Nous: Hermes 4 70B'
+  - Id: ~openai/gpt-latest
+    Name: OpenAI GPT Latest
+  - Id: ~openai/gpt-mini-latest
+    Name: OpenAI GPT Mini Latest
+  - Id: openai/gpt-audio
+    Name: 'OpenAI: GPT Audio'
+  - Id: openai/gpt-audio-mini
+    Name: 'OpenAI: GPT Audio Mini'
+  - Id: openai/gpt-chat-latest
+    Name: 'OpenAI: GPT Chat Latest'
+  - Id: openai/gpt-3.5-turbo
+    Name: 'OpenAI: GPT-3.5 Turbo'
+  - Id: openai/gpt-3.5-turbo-0613
+    Name: 'OpenAI: GPT-3.5 Turbo (older v0613)'
+  - Id: openai/gpt-3.5-turbo-16k
+    Name: 'OpenAI: GPT-3.5 Turbo 16k'
+  - Id: openai/gpt-3.5-turbo-instruct
+    Name: 'OpenAI: GPT-3.5 Turbo Instruct'
+  - Id: openai/gpt-4
+    Name: 'OpenAI: GPT-4'
+  - Id: openai/gpt-4-turbo
+    Name: 'OpenAI: GPT-4 Turbo'
+  - Id: openai/gpt-4-turbo-preview
+    Name: 'OpenAI: GPT-4 Turbo Preview'
+  - Id: openai/gpt-4.1
+    Name: 'OpenAI: GPT-4.1'
+  - Id: openai/gpt-4.1-mini
+    Name: 'OpenAI: GPT-4.1 Mini'
+  - Id: openai/gpt-4.1-nano
+    Name: 'OpenAI: GPT-4.1 Nano'
+  - Id: openai/gpt-4o
+    Name: 'OpenAI: GPT-4o'
+  - Id: openai/gpt-4o-2024-05-13
+    Name: 'OpenAI: GPT-4o (2024-05-13)'
+  - Id: openai/gpt-4o-2024-08-06
+    Name: 'OpenAI: GPT-4o (2024-08-06)'
+  - Id: openai/gpt-4o-2024-11-20
+    Name: 'OpenAI: GPT-4o (2024-11-20)'
+  - Id: openai/gpt-4o-search-preview
+    Name: 'OpenAI: GPT-4o Search Preview'
+  - Id: openai/gpt-4o-mini
+    Name: 'OpenAI: GPT-4o-mini'
+  - Id: openai/gpt-4o-mini-2024-07-18
+    Name: 'OpenAI: GPT-4o-mini (2024-07-18)'
+  - Id: openai/gpt-4o-mini-search-preview
+    Name: 'OpenAI: GPT-4o-mini Search Preview'
+  - Id: openai/gpt-5
+    Name: 'OpenAI: GPT-5'
+  - Id: openai/gpt-5-chat
+    Name: 'OpenAI: GPT-5 Chat'
+  - Id: openai/gpt-5-codex
+    Name: 'OpenAI: GPT-5 Codex'
+  - Id: openai/gpt-5-image
+    Name: 'OpenAI: GPT-5 Image'
+  - Id: openai/gpt-5-image-mini
+    Name: 'OpenAI: GPT-5 Image Mini'
+  - Id: openai/gpt-5-mini
+    Name: 'OpenAI: GPT-5 Mini'
+  - Id: openai/gpt-5-nano
+    Name: 'OpenAI: GPT-5 Nano'
+  - Id: openai/gpt-5-pro
+    Name: 'OpenAI: GPT-5 Pro'
+  - Id: openai/gpt-5.1
+    Name: 'OpenAI: GPT-5.1'
+  - Id: openai/gpt-5.1-chat
+    Name: 'OpenAI: GPT-5.1 Chat'
+  - Id: openai/gpt-5.1-codex
+    Name: 'OpenAI: GPT-5.1-Codex'
+  - Id: openai/gpt-5.1-codex-max
+    Name: 'OpenAI: GPT-5.1-Codex-Max'
+  - Id: openai/gpt-5.1-codex-mini
+    Name: 'OpenAI: GPT-5.1-Codex-Mini'
+  - Id: openai/gpt-5.2
+    Name: 'OpenAI: GPT-5.2'
+  - Id: openai/gpt-5.2-chat
+    Name: 'OpenAI: GPT-5.2 Chat'
+  - Id: openai/gpt-5.2-pro
+    Name: 'OpenAI: GPT-5.2 Pro'
+  - Id: openai/gpt-5.2-codex
+    Name: 'OpenAI: GPT-5.2-Codex'
+  - Id: openai/gpt-5.3-chat
+    Name: 'OpenAI: GPT-5.3 Chat'
+  - Id: openai/gpt-5.3-codex
+    Name: 'OpenAI: GPT-5.3-Codex'
+  - Id: openai/gpt-5.4
+    Name: 'OpenAI: GPT-5.4'
+  - Id: openai/gpt-5.4-image-2
+    Name: 'OpenAI: GPT-5.4 Image 2'
+  - Id: openai/gpt-5.4-mini
+    Name: 'OpenAI: GPT-5.4 Mini'
+  - Id: openai/gpt-5.4-nano
+    Name: 'OpenAI: GPT-5.4 Nano'
+  - Id: openai/gpt-5.4-pro
+    Name: 'OpenAI: GPT-5.4 Pro'
+  - Id: openai/gpt-5.5
+    Name: 'OpenAI: GPT-5.5'
+  - Id: openai/gpt-5.5-pro
+    Name: 'OpenAI: GPT-5.5 Pro'
+  - Id: openai/gpt-oss-120b
+    Name: 'OpenAI: gpt-oss-120b'
+  - Id: openai/gpt-oss-120b:free
+    Name: 'OpenAI: gpt-oss-120b (free)'
+  - Id: openai/gpt-oss-20b
+    Name: 'OpenAI: gpt-oss-20b'
+  - Id: openai/gpt-oss-20b:free
+    Name: 'OpenAI: gpt-oss-20b (free)'
+  - Id: openai/gpt-oss-safeguard-20b
+    Name: 'OpenAI: gpt-oss-safeguard-20b'
+  - Id: openai/o1
+    Name: 'OpenAI: o1'
+  - Id: openai/o1-pro
+    Name: 'OpenAI: o1-pro'
+  - Id: openai/o3
+    Name: 'OpenAI: o3'
+  - Id: openai/o3-deep-research
+    Name: 'OpenAI: o3 Deep Research'
+  - Id: openai/o3-mini
+    Name: 'OpenAI: o3 Mini'
+  - Id: openai/o3-mini-high
+    Name: 'OpenAI: o3 Mini High'
+  - Id: openai/o3-pro
+    Name: 'OpenAI: o3 Pro'
+  - Id: openai/o4-mini
+    Name: 'OpenAI: o4 Mini'
+  - Id: openai/o4-mini-deep-research
+    Name: 'OpenAI: o4 Mini Deep Research'
+  - Id: openai/o4-mini-high
+    Name: 'OpenAI: o4 Mini High'
+  - Id: openrouter/fusion
+    Name: 'OpenRouter: Fusion'
+  - Id: openrouter/pareto-code
+    Name: Pareto Code Router
+  - Id: perceptron/perceptron-mk1
+    Name: 'Perceptron: Perceptron Mk1'
+  - Id: perplexity/sonar
+    Name: 'Perplexity: Sonar'
+  - Id: perplexity/sonar-deep-research
+    Name: 'Perplexity: Sonar Deep Research'
+  - Id: perplexity/sonar-pro
+    Name: 'Perplexity: Sonar Pro'
+  - Id: perplexity/sonar-pro-search
+    Name: 'Perplexity: Sonar Pro Search'
+  - Id: perplexity/sonar-reasoning-pro
+    Name: 'Perplexity: Sonar Reasoning Pro'
+  - Id: poolside/laguna-m.1
+    Name: 'Poolside: Laguna M.1'
+  - Id: poolside/laguna-m.1:free
+    Name: 'Poolside: Laguna M.1 (free)'
+  - Id: poolside/laguna-xs.2
+    Name: 'Poolside: Laguna XS.2'
+  - Id: poolside/laguna-xs.2:free
+    Name: 'Poolside: Laguna XS.2 (free)'
+  - Id: qwen/qwen-2.5-72b-instruct
+    Name: Qwen2.5 72B Instruct
+  - Id: qwen/qwen-2.5-coder-32b-instruct
+    Name: Qwen2.5 Coder 32B Instruct
+  - Id: qwen/qwen-plus-2025-07-28
+    Name: 'Qwen: Qwen Plus 0728'
+  - Id: qwen/qwen-plus-2025-07-28:thinking
+    Name: 'Qwen: Qwen Plus 0728 (thinking)'
+  - Id: qwen/qwen-plus
+    Name: 'Qwen: Qwen-Plus'
+  - Id: qwen/qwen-2.5-7b-instruct
+    Name: 'Qwen: Qwen2.5 7B Instruct'
+  - Id: qwen/qwen2.5-vl-72b-instruct
+    Name: 'Qwen: Qwen2.5 VL 72B Instruct'
+  - Id: qwen/qwen3-14b
+    Name: 'Qwen: Qwen3 14B'
+  - Id: qwen/qwen3-235b-a22b
+    Name: 'Qwen: Qwen3 235B A22B'
+  - Id: qwen/qwen3-235b-a22b-2507
+    Name: 'Qwen: Qwen3 235B A22B Instruct 2507'
+  - Id: qwen/qwen3-235b-a22b-thinking-2507
+    Name: 'Qwen: Qwen3 235B A22B Thinking 2507'
+  - Id: qwen/qwen3-30b-a3b
+    Name: 'Qwen: Qwen3 30B A3B'
+  - Id: qwen/qwen3-30b-a3b-instruct-2507
+    Name: 'Qwen: Qwen3 30B A3B Instruct 2507'
+  - Id: qwen/qwen3-30b-a3b-thinking-2507
+    Name: 'Qwen: Qwen3 30B A3B Thinking 2507'
+  - Id: qwen/qwen3-32b
+    Name: 'Qwen: Qwen3 32B'
+  - Id: qwen/qwen3-8b
+    Name: 'Qwen: Qwen3 8B'
+  - Id: qwen/qwen3-coder-30b-a3b-instruct
+    Name: 'Qwen: Qwen3 Coder 30B A3B Instruct'
+  - Id: qwen/qwen3-coder
+    Name: 'Qwen: Qwen3 Coder 480B A35B'
+  - Id: qwen/qwen3-coder:free
+    Name: 'Qwen: Qwen3 Coder 480B A35B (free)'
+  - Id: qwen/qwen3-coder-flash
+    Name: 'Qwen: Qwen3 Coder Flash'
+  - Id: qwen/qwen3-coder-next
+    Name: 'Qwen: Qwen3 Coder Next'
+  - Id: qwen/qwen3-coder-plus
+    Name: 'Qwen: Qwen3 Coder Plus'
+  - Id: qwen/qwen3-max
+    Name: 'Qwen: Qwen3 Max'
+  - Id: qwen/qwen3-max-thinking
+    Name: 'Qwen: Qwen3 Max Thinking'
+  - Id: qwen/qwen3-next-80b-a3b-instruct
+    Name: 'Qwen: Qwen3 Next 80B A3B Instruct'
+  - Id: qwen/qwen3-next-80b-a3b-instruct:free
+    Name: 'Qwen: Qwen3 Next 80B A3B Instruct (free)'
+  - Id: qwen/qwen3-next-80b-a3b-thinking
+    Name: 'Qwen: Qwen3 Next 80B A3B Thinking'
+  - Id: qwen/qwen3-vl-235b-a22b-instruct
+    Name: 'Qwen: Qwen3 VL 235B A22B Instruct'
+  - Id: qwen/qwen3-vl-235b-a22b-thinking
+    Name: 'Qwen: Qwen3 VL 235B A22B Thinking'
+  - Id: qwen/qwen3-vl-30b-a3b-instruct
+    Name: 'Qwen: Qwen3 VL 30B A3B Instruct'
+  - Id: qwen/qwen3-vl-30b-a3b-thinking
+    Name: 'Qwen: Qwen3 VL 30B A3B Thinking'
+  - Id: qwen/qwen3-vl-32b-instruct
+    Name: 'Qwen: Qwen3 VL 32B Instruct'
+  - Id: qwen/qwen3-vl-8b-instruct
+    Name: 'Qwen: Qwen3 VL 8B Instruct'
+  - Id: qwen/qwen3-vl-8b-thinking
+    Name: 'Qwen: Qwen3 VL 8B Thinking'
+  - Id: qwen/qwen3.5-397b-a17b
+    Name: 'Qwen: Qwen3.5 397B A17B'
+  - Id: qwen/qwen3.5-plus-02-15
+    Name: 'Qwen: Qwen3.5 Plus 2026-02-15'
+  - Id: qwen/qwen3.5-plus-20260420
+    Name: 'Qwen: Qwen3.5 Plus 2026-04-20'
+  - Id: qwen/qwen3.5-122b-a10b
+    Name: 'Qwen: Qwen3.5-122B-A10B'
+  - Id: qwen/qwen3.5-27b
+    Name: 'Qwen: Qwen3.5-27B'
+  - Id: qwen/qwen3.5-35b-a3b
+    Name: 'Qwen: Qwen3.5-35B-A3B'
+  - Id: qwen/qwen3.5-9b
+    Name: 'Qwen: Qwen3.5-9B'
+  - Id: qwen/qwen3.5-flash-02-23
+    Name: 'Qwen: Qwen3.5-Flash'
+  - Id: qwen/qwen3.6-27b
+    Name: 'Qwen: Qwen3.6 27B'
+  - Id: qwen/qwen3.6-35b-a3b
+    Name: 'Qwen: Qwen3.6 35B A3B'
+  - Id: qwen/qwen3.6-flash
+    Name: 'Qwen: Qwen3.6 Flash'
+  - Id: qwen/qwen3.6-max-preview
+    Name: 'Qwen: Qwen3.6 Max Preview'
+  - Id: qwen/qwen3.6-plus
+    Name: 'Qwen: Qwen3.6 Plus'
+  - Id: qwen/qwen3.7-max
+    Name: 'Qwen: Qwen3.7 Max'
+  - Id: qwen/qwen3.7-plus
+    Name: 'Qwen: Qwen3.7 Plus'
+  - Id: undi95/remm-slerp-l2-13b
+    Name: ReMM SLERP 13B
+  - Id: rekaai/reka-edge
+    Name: Reka Edge
+  - Id: rekaai/reka-flash-3
+    Name: Reka Flash 3
+  - Id: relace/relace-apply-3
+    Name: 'Relace: Relace Apply 3'
+  - Id: relace/relace-search
+    Name: 'Relace: Relace Search'
+  - Id: sakana/fugu-ultra
+    Name: 'Sakana: Fugu Ultra'
+  - Id: sao10k/l3-lunaris-8b
+    Name: 'Sao10K: Llama 3 8B Lunaris'
+  - Id: sao10k/l3.1-70b-hanami-x1
+    Name: 'Sao10K: Llama 3.1 70B Hanami x1'
+  - Id: sao10k/l3.1-euryale-70b
+    Name: 'Sao10K: Llama 3.1 Euryale 70B v2.2'
+  - Id: sao10k/l3.3-euryale-70b
+    Name: 'Sao10K: Llama 3.3 Euryale 70B'
+  - Id: stepfun/step-3.5-flash
+    Name: 'StepFun: Step 3.5 Flash'
+  - Id: stepfun/step-3.7-flash
+    Name: 'StepFun: Step 3.7 Flash'
+  - Id: switchpoint/router
+    Name: Switchpoint Router
+  - Id: tencent/hunyuan-a13b-instruct
+    Name: 'Tencent: Hunyuan A13B Instruct'
+  - Id: tencent/hy3-preview
+    Name: 'Tencent: Hy3 preview'
+  - Id: thedrummer/cydonia-24b-v4.1
+    Name: 'TheDrummer: Cydonia 24B V4.1'
+  - Id: thedrummer/rocinante-12b
+    Name: 'TheDrummer: Rocinante 12B'
+  - Id: thedrummer/skyfall-36b-v2
+    Name: 'TheDrummer: Skyfall 36B V2'
+  - Id: thedrummer/unslopnemo-12b
+    Name: 'TheDrummer: UnslopNemo 12B'
+  - Id: upstage/solar-pro-3
+    Name: 'Upstage: Solar Pro 3'
+  - Id: cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+    Name: 'Venice: Uncensored (free)'
+  - Id: microsoft/wizardlm-2-8x22b
+    Name: WizardLM-2 8x22B
+  - Id: writer/palmyra-x5
+    Name: 'Writer: Palmyra X5'
+  - Id: xiaomi/mimo-v2.5
+    Name: 'Xiaomi: MiMo-V2.5'
+  - Id: xiaomi/mimo-v2.5-pro
+    Name: 'Xiaomi: MiMo-V2.5-Pro'
+  - Id: z-ai/glm-4.5
+    Name: 'Z.ai: GLM 4.5'
+  - Id: z-ai/glm-4.5-air
+    Name: 'Z.ai: GLM 4.5 Air'
+  - Id: z-ai/glm-4.5v
+    Name: 'Z.ai: GLM 4.5V'
+  - Id: z-ai/glm-4.6
+    Name: 'Z.ai: GLM 4.6'
+  - Id: z-ai/glm-4.6v
+    Name: 'Z.ai: GLM 4.6V'
+  - Id: z-ai/glm-4.7
+    Name: 'Z.ai: GLM 4.7'
+  - Id: z-ai/glm-4.7-flash
+    Name: 'Z.ai: GLM 4.7 Flash'
+  - Id: z-ai/glm-5
+    Name: 'Z.ai: GLM 5'
+  - Id: z-ai/glm-5-turbo
+    Name: 'Z.ai: GLM 5 Turbo'
+  - Id: z-ai/glm-5.1
+    Name: 'Z.ai: GLM 5.1'
+  - Id: z-ai/glm-5.2
+    Name: 'Z.ai: GLM 5.2'
+  - Id: z-ai/glm-5v-turbo
+    Name: 'Z.ai: GLM 5V Turbo'
+  - Id: inclusionai/ling-2.6-1t
+    Name: 'inclusionAI: Ling-2.6-1T'
+  - Id: inclusionai/ling-2.6-flash
+    Name: 'inclusionAI: Ling-2.6-flash'
+  - Id: inclusionai/ring-2.6-1t
+    Name: 'inclusionAI: Ring-2.6-1T'
+  - Id: x-ai/grok-4.20
+    Name: 'xAI: Grok 4.20'
+  - Id: x-ai/grok-4.20-multi-agent
+    Name: 'xAI: Grok 4.20 Multi-Agent'
+  - Id: x-ai/grok-4.3
+    Name: 'xAI: Grok 4.3'
+  - Id: x-ai/grok-build-0.1
+    Name: 'xAI: Grok Build 0.1'
+  AvailableModelsBaseUrl: https://openrouter.ai/api/v1
