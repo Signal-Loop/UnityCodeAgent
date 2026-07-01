@@ -24,6 +24,7 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 - `Packages/com.signal-loop.unitycodeagent/Editor/Service`: Unity-side service bridge for manifest handling, loopback HTTP calls, SSE subscriptions, and the `AgentService` facade consumed by the UI.
 - `Packages/com.signal-loop.unitycodeagent/Editor/Contracts`: Shared DTOs and event types used by both Unity and the local service.
 - `Assets/Tests/Editor/Service`: Unity EditMode coverage for transport behavior, reconnect flows, and service restart recovery.
+- `.unityCodeAgent/client/logs/unity.log`: Path to the Unity Editor log file.
 
 ### Local Service Side
 
@@ -34,6 +35,8 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 - `CopilotService.Tests`: In-process endpoint and contract tests that host the real `Program` pipeline.
 - `.unityCodeAgent/service/runtime/endpoint.json`: Project-scoped runtime endpoint manifest written and consumed during local service bootstrap.
 - `Assets/Plugins/UnityCodeAgent/Editor/UnityCodeAgentSettings.asset`: Settings for running UnityCodeAgent.
+- `.unityCodeAgent/service/logs/service.log`: Path to Agent Service log file.
+- `.unityCodeAgent/service/logs/telemetry.jsonl`: Path to Telemetry log file.
 
 ## Conventions
 

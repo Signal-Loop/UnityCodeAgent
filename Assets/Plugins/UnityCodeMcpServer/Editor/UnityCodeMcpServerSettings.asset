@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityCodeMcpServer::UnityCodeMcpServer.Settings.UnityCodeMcpServerSettings
   MinLogLevel: 2
   LogToFile: 0
-  AdditionalAssemblyNames: []
+  AdditionalAssemblyNames:
+  - UnityCodeAgent.Editor
   InputActionsAssetPath: 
   SkillsInstallTarget: 2
   SkillsTargetPath: .agents/skills/

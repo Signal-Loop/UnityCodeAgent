@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -121,7 +121,8 @@ namespace SignalLoop.UnityCodeAgent.Settings
             }
 
             serializedObject.ApplyModifiedProperties();
-            if (!settings.AddToolAssembly(assemblyName))
+            var success = settings.AddToolAssembly(assemblyName);
+            if (!success)
             {
                 return false;
             }

@@ -25,7 +25,7 @@ MonoBehaviour:
   TelemetryCaptureContent: 1
   MockAgentService: 0
   AdditionalToolAssemblyNames: []
-  InputActionsAssetPath:
+  InputActionsAssetPath: 
   ProviderType: 1
   ByokBaseUrl: https://openrouter.ai/api/v1
   Skills:
@@ -36,13 +36,15 @@ MonoBehaviour:
     - create-release
     - kanban-task-workflow
     - project-python
+    - executing-csharp-scripts-in-unity-editor
+    - deepeval
     _defaultsInitialized: 1
   SkillsInstallTarget: 2
   SkillsTargetPath: .agents/skills
   _hasInitializedSkillsInstallTarget: 1
   Model:
-    Id: deepseek/deepseek-v4-flash
-    Name: 'DeepSeek: DeepSeek V4 Flash'
+    Id: xiaomi/mimo-v2.5
+    Name: 'Xiaomi: MiMo-V2.5'
   AvailableModels:
   - Id: ai21/jamba-large-1.7
     Name: 'AI21: Jamba Large 1.7'

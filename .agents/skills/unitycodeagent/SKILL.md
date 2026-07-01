@@ -1,6 +1,6 @@
 ---
-name: executing-csharp-scripts-in-unity-editor
-description: Use this skill always when you need to use execute_csharp_script_in_unity_editor tool to modify scenes, add, remove or modify game objects, components, scriptable objects or perform any other task in Unity Editor using C# scripts. Also covers when and how to use read_unity_console_logs and run_unity_tests tools as part of the same workflow  and create or modify favourite scripts used to automate tasks.
+name: unitycodeagent
+description: TRIGGER when you need to modify scenes, add, remove or modify game objects, components, scriptable objects or perform any other task in Unity Editor. Also covers when and how to use read_unity_console_logs and run_unity_tests tools as part of the same workflow  and create or modify favourite scripts used to automate tasks. DO NOT TRIGGER for generic C# code execution, file editing, or other non-Unity Editor tasks.
 ---
 
 # Executing C# Scripts in Unity Editor
@@ -164,18 +164,13 @@ Only loaded assemblies are available.
 
 #### Loading Additional Assemblies:
 
-Additional assemblies are defined in `AdditionalAssemblyNames` list in `Assets/Plugins/UnityCodeMcpServer/Editor/UnityCodeMcpServerSettings.asset`. Add any assembly name there (e.g., "MyCustomAssembly") and it will be loaded and available in the script context.
+Additional assemblies are defined in `AdditionalAssemblyNames` list in `Assets/Plugins/UnityCodeAgent/Editor/UnityCodeAgentSettings.asset`. Add any assembly name there (e.g., "MyCustomAssembly") and it will be loaded and available in the script context.
+When encountering errors about missing types or namespaces, like `error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)`:
 
-#### Forcing Settings Reload After File Edit:
-
-After editing `UnityCodeMcpServerSettings.asset` directly via file tools, the new assemblies are **not** available until Unity reprocesses the asset. After the file edit, execute this script to force a reload before using the new assemblies:
-
+1. Identify the required assembly and namespace for the API you are trying to use.
+2. Use the following code to add an assembly to the settings:
 ```csharp
-var settings = AssetDatabase.LoadAssetAtPath<ScriptableObject>("Assets/Plugins/UnityCodeMcpServer/Editor/UnityCodeMcpServerSettings.asset");
-EditorUtility.SetDirty(settings);
-AssetDatabase.SaveAssets();
-AssetDatabase.ImportAsset("Assets/Plugins/UnityCodeMcpServer/Editor/UnityCodeMcpServerSettings.asset", ImportAssetOptions.ForceUpdate);
-Debug.Log("Settings reloaded — new assemblies now available");
+SignalLoop.UnityCodeAgent.Settings.UnityCodeAgentSettings.Instance.AddToolAssembly("UnityEngine.Physics2DModule");
 ```
 
 ### Key API Reference
@@ -282,13 +277,3 @@ if (target != null) {
     UnityEngine.Debug.Log("Object not found — nothing to destroy");
 }
 ```
-
-### Missing Namespace or Assembly Errors
-
-When encountering errors about missing types or namespaces, like `error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)`:
-
-1. Identify the required assembly and namespace for the API you are trying to use.
-2. Check if that assembly is included in the loaded assemblies or `AdditionalAssemblyNames` in `UnityCodeMcpServerSettings.asset`.
-3. If it is not, add it to `AdditionalAssemblyNames` in `UnityCodeMcpServerSettings.asset` via file tools.
-4. **Force a settings reload** by executing the reload script from the _Forcing Settings Reload After File Edit_ section above. The new assembly will not be available until this is done.
-5. Ensure you have the correct `using` directive for the namespace at the top of your script.

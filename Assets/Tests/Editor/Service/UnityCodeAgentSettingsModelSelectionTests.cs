@@ -142,6 +142,30 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(validationMessage, Is.EqualTo("BaseUrl must be a full HTTPS URL."));
         }
 
+        [Test]
+        [Description("Goal: verify tool assembly validation accepts loaded non-default assemblies and rejects missing ones. Scope: UnityCodeAgentSettings tool assembly validation only. Boundaries: excludes UI dropdown behavior and persistence.")]
+        public void ValidateAssemblyName_ValidatesLoadedGlobalAssemblies()
+        {
+            var settings = CreateSettings();
+            var loadedAssemblyName = "Unity.RenderPipelines.Core.Runtime";
+
+            Assert.That(settings.ValidateAssemblyName(loadedAssemblyName), Is.Empty);
+            Assert.That(settings.AddToolAssembly(loadedAssemblyName), Is.True);
+            Assert.That(settings.AdditionalToolAssemblyNames, Does.Contain(loadedAssemblyName));
+        }
+
+        [Test]
+        [Description("Goal: verify tool assembly validation rejects names that are not present in the loaded global assemblies. Scope: UnityCodeAgentSettings tool assembly validation only. Boundaries: excludes UI dropdown behavior and persistence.")]
+        public void ValidateAssemblyName_MissingAssembly_ThrowsArgumentException()
+        {
+            var settings = CreateSettings();
+
+            var exception = Assert.Throws<System.ArgumentException>(() => settings.ValidateAssemblyName("Definitely.Missing.Assembly"));
+            Assert.That(exception.Message, Is.EqualTo("Assembly 'Definitely.Missing.Assembly' is not loaded in the current AppDomain."));
+            Assert.Throws<System.ArgumentException>(() => settings.AddToolAssembly("Definitely.Missing.Assembly"));
+            Assert.That(settings.AdditionalToolAssemblyNames, Is.Empty);
+        }
+
         private static UnityCodeAgentSettings CreateSettings()
             => ScriptableObject.CreateInstance<UnityCodeAgentSettings>();
     }
