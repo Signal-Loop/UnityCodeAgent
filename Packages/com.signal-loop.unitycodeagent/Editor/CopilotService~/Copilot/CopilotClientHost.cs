@@ -15,7 +15,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
 
     private readonly ByokOpenAiProvider _byokOpenAiProvider;
     private readonly UnityCodeCopilotServiceLogger _log;
-    private readonly CliTelemetryConfigFactory _cliTelemetryConfigFactory;
+    private readonly TelemetryConfigFactory _cliTelemetryConfigFactory;
     private readonly McpConfigLoader _mcpConfigLoader;
     private readonly ProjectPaths _paths;
     private readonly CopilotTelemetry _telemetry;
@@ -28,7 +28,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
         McpConfigLoader mcpConfigLoader,
         AgentToolInvocationBridge toolInvocationBridge,
         ProjectPaths paths,
-        CliTelemetryConfigFactory cliTelemetryConfigFactory,
+        TelemetryConfigFactory cliTelemetryConfigFactory,
         CopilotTelemetry telemetry)
     {
         _byokOpenAiProvider = byokOpenAiProvider;

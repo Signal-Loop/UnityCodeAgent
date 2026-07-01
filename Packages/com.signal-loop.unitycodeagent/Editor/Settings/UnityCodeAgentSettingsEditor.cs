@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,7 +24,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         private SerializedProperty _logToFile;
         private SerializedProperty _telemetryMode;
         private SerializedProperty _otlpEndpoint;
-        private SerializedProperty _cliTelemetryFilePath;
+        private SerializedProperty _telemetryFilePath;
         private SerializedProperty _telemetryCaptureContent;
         private SerializedProperty _providerType;
         private SerializedProperty _byokBaseUrl;
@@ -45,7 +45,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
             _logToFile = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.LogToFile));
             _telemetryMode = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.TelemetryMode));
             _otlpEndpoint = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.OtlpEndpoint));
-            _cliTelemetryFilePath = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.CliTelemetryFilePath));
+            _telemetryFilePath = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.TelemetryFilePath));
             _telemetryCaptureContent = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.TelemetryCaptureContent));
             _providerType = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.ProviderType));
             _byokBaseUrl = serializedObject.FindProperty(nameof(UnityCodeAgentSettings.ByokBaseUrl));
@@ -142,7 +142,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
             EditorGUILayout.LabelField("Telemetry", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_telemetryMode);
             EditorGUILayout.PropertyField(_otlpEndpoint);
-            EditorGUILayout.PropertyField(_cliTelemetryFilePath);
+            EditorGUILayout.PropertyField(_telemetryFilePath);
             EditorGUILayout.PropertyField(_telemetryCaptureContent);
 
             if (serializedObject.ApplyModifiedProperties())

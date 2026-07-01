@@ -33,7 +33,7 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 - `Packages/com.signal-loop.unitycodeagent/Editor/CopilotService~/Infrastructure`, `Options`, `Settings`, `Telemetry`: Cross-cutting service configuration, dependency setup, logging, and operational concerns.
 - `CopilotService.Tests`: In-process endpoint and contract tests that host the real `Program` pipeline.
 - `.unityCodeAgent/service/runtime/endpoint.json`: Project-scoped runtime endpoint manifest written and consumed during local service bootstrap.
-- `Assets\Plugins\UnityCodeAgent\Editor\UnityCodeAgentSettings.asset`: Settings for running UnityCodeAgent.
+- `Assets/Plugins/UnityCodeAgent/Editor/UnityCodeAgentSettings.asset`: Settings for running UnityCodeAgent.
 
 ## Conventions
 

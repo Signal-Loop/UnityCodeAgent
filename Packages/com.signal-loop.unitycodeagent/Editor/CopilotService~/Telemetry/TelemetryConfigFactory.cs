@@ -1,17 +1,17 @@
-using GitHub.Copilot;
+﻿using GitHub.Copilot;
 using Microsoft.Extensions.Options;
 using UnityCodeCopilot.Service.Infrastructure;
 using UnityCodeCopilot.Service.Options;
 
 namespace UnityCodeCopilot.Service.Telemetry;
 
-public sealed class CliTelemetryConfigFactory
+public sealed class TelemetryConfigFactory
 {
     private readonly bool _enableTelemetry;
     private readonly ServiceOptions _options;
     private readonly ProjectPaths _paths;
 
-    public CliTelemetryConfigFactory(ProjectPaths paths, IOptions<ServiceOptions> options)
+    public TelemetryConfigFactory(ProjectPaths paths, IOptions<ServiceOptions> options)
     {
         _paths = paths;
         _options = options.Value;
@@ -40,7 +40,7 @@ public sealed class CliTelemetryConfigFactory
         Directory.CreateDirectory(_paths.LogsRoot.Replace('/', Path.DirectorySeparatorChar));
         return new TelemetryConfig
         {
-            FilePath = ResolveCliTelemetryFilePath(),
+            FilePath = ResolveTelemetryFilePath(),
             ExporterType = "file",
             SourceName = TelemetryDefaults.CliTelemetrySourceName,
             CaptureContent = _options.TelemetryCaptureContent,
@@ -52,16 +52,16 @@ public sealed class CliTelemetryConfigFactory
             ? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
             : _options.OtlpEndpoint;
 
-    private string ResolveCliTelemetryFilePath()
+    private string ResolveTelemetryFilePath()
     {
-        if (string.IsNullOrWhiteSpace(_options.CliTelemetryFilePath))
+        if (string.IsNullOrWhiteSpace(_options.TelemetryFilePath))
         {
             return $"{_paths.LogsRoot}/telemetry.jsonl";
         }
 
-        var filePath = Path.IsPathRooted(_options.CliTelemetryFilePath)
-            ? Path.GetFullPath(_options.CliTelemetryFilePath)
-            : Path.GetFullPath(_options.CliTelemetryFilePath, _paths.ProjectRoot.Replace('/', Path.DirectorySeparatorChar));
+        var filePath = Path.IsPathRooted(_options.TelemetryFilePath)
+            ? Path.GetFullPath(_options.TelemetryFilePath)
+            : Path.GetFullPath(_options.TelemetryFilePath, _paths.ProjectRoot.Replace('/', Path.DirectorySeparatorChar));
 
         return filePath.Replace('\\', '/');
     }

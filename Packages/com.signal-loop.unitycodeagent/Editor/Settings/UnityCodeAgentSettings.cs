@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using SignalLoop.UnityCodeAgent.Contracts;
@@ -64,7 +64,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         public string OtlpEndpoint = string.Empty;
 
         [Tooltip("SDK/CLI telemetry file path used when Telemetry Mode is set to File. Leave empty to use .unityCodeAgent/service/logs/telemetry.jsonl.")]
-        public string CliTelemetryFilePath = string.Empty;
+        public string TelemetryFilePath = string.Empty;
 
         [Tooltip("When enabled, telemetry exporters may include prompt and response content. Ignored when Telemetry Mode is None.")]
         public bool TelemetryCaptureContent = true;
@@ -515,7 +515,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
                 settings.LogToFile,
                 settings.TelemetryMode,
                 settings.OtlpEndpoint,
-                settings.CliTelemetryFilePath,
+                settings.TelemetryFilePath,
                 settings.TelemetryCaptureContent,
                 settings.GetEnabledSkillDirectories(),
                 settings.GetDisabledSkillNames(),

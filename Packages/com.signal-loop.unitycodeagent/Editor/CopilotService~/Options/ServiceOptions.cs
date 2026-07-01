@@ -1,4 +1,4 @@
-using UnityCodeCopilot.Service.Settings;
+﻿using UnityCodeCopilot.Service.Settings;
 
 namespace UnityCodeCopilot.Service.Options;
 
@@ -11,6 +11,6 @@ public sealed class ServiceOptions
     public bool LogToFile { get; set; } = true;
     public bool EnableTelemetry { get; set; } = true;
     public string? OtlpEndpoint { get; set; }
-    public string? CliTelemetryFilePath { get; set; }
+    public string? TelemetryFilePath { get; set; }
     public bool TelemetryCaptureContent { get; set; } = true;
 }

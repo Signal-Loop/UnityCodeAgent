@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -221,9 +221,9 @@ namespace SignalLoop.UnityCodeAgent.Service
                         " --EnableTelemetry=true" +
                         $" --TelemetryCaptureContent={context.TelemetryCaptureContent}";
 
-                    if (!string.IsNullOrWhiteSpace(context.CliTelemetryFilePath))
+                    if (!string.IsNullOrWhiteSpace(context.TelemetryFilePath))
                     {
-                        fileArguments += $" --CliTelemetryFilePath=\"{context.CliTelemetryFilePath.Trim()}\"";
+                        fileArguments += $" --TelemetryFilePath=\"{context.TelemetryFilePath.Trim()}\"";
                     }
 
                     return fileArguments;
