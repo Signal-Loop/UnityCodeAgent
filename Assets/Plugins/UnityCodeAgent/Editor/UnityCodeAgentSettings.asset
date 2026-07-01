@@ -15,11 +15,11 @@ MonoBehaviour:
   UseDynamicServicePort: 1
   ServicePort: 5007
   ServiceOrphanTimeoutSeconds: 90
-  MinLogLevel: 0
+  MinLogLevel: 1
   LogToFile: 1
   ShowEventsSourceInChat: 0
   ShowAllEventsInChat: 0
-  TelemetryMode: 1
+  TelemetryMode: 2
   OtlpEndpoint: http://localhost:4318/
   CliTelemetryFilePath: C:\Users\tbory\source\Workspaces\Loop\UnityCodeAgent\.unityCodeAgent\service\logs\telemetry.jsonl
   TelemetryCaptureContent: 1
