@@ -6,7 +6,8 @@ public sealed class ServiceOptions
 {
     public string ProjectRoot { get; set; } = string.Empty;
     public int UnityProcessId { get; set; }
-    public int OrphanTimeoutSeconds { get; set; } = 5;
+    public bool NoUnity { get; set; }
+    public int OrphanTimeoutSeconds { get; set; } = 20;
     public UnityCodeCopilotServiceLogger.LogLevel MinLogLevel { get; set; } = UnityCodeCopilotServiceLogger.LogLevel.Info;
     public bool LogToFile { get; set; } = true;
     public bool EnableTelemetry { get; set; } = true;

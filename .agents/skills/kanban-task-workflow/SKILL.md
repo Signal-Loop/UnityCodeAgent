@@ -96,15 +96,26 @@ Research before planning. Inspect the relevant code, tests, contracts, docs, and
 
 If the current task title or filename is vague, stale, or misleading, rename the task during planning so both the file-local `#` heading and the markdown filename better reflect the real scope. Keep the new name concise and specific, and avoid renaming when the current name is already clear enough.
 
-Every implementation plan must include a concise C4 change diagram suite in Mermaid:
+Every implementation plan must include a concise C4 change diagram suite in PlantUML:
 
 - Required: System Context, Container, Component, and Code views.
-- Use `C4Context`, `C4Container`, and `C4Component` where possible.
-- Use `classDiagram`, `flowchart`, or another Mermaid diagram for the Code view.
-- Add `C4Dynamic` for changed flows or sequencing.
-- Add `C4Deployment` for changed runtime, hosting, packaging, ports, permissions, or environment assumptions.
+- Use PlantUML C4 macros such as `C4Context`, `C4Container`, and `C4Component` where possible.
+- Use a simple PlantUML class diagram for the Code view when C4 macros are not appropriate.
+- Use PlantUML sequence or activity diagrams for dynamic behavior when the task changes a runtime flow, adds a feature, or alters an existing flow.
 - Label meaningful new, changed, removed, and unchanged elements.
 - Keep diagrams task-scoped; write "No change" for required views with no impact.
+
+Example:
+
+```plantuml
+@startuml
+!include <C4/C4_Context>
+title System Context - sample
+Person(user, "User", "Uses the feature")
+System(system, "Target System", "The thing being changed")
+Rel(user, system, "Uses")
+@enduml
+```
 
 Then update the selected task with a concise implementation plan:
 
@@ -131,8 +142,7 @@ C4 Change Diagrams:
 - Container:
 - Component:
 - Code:
-- Dynamic, if needed:
-- Deployment, if needed:
+- Flowchart/Sequence:
 
 Verification:
 - Test or check...

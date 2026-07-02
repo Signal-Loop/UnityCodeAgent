@@ -44,7 +44,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         public int ServicePort = 5007;
 
         [Tooltip("Timeout in seconds before the service shuts down after the Unity parent process disappears.")]
-        public int ServiceOrphanTimeoutSeconds = 90;
+        public int ServiceOrphanTimeoutSeconds = 20;
 
         [Tooltip("Minimum log level. Messages below this level are suppressed.")]
         public UnityCodeAgentLogger.LogLevel MinLogLevel = UnityCodeAgentLogger.LogLevel.Info;

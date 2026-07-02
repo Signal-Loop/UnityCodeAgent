@@ -1,0 +1,101 @@
+[[scenario]]
+id = "image_missing_ui_assembly"
+prompt = "Create a GameObject named Eval_Image_Target and add a UnityEngine.UI Image component to it. Use the unitycodeagent skill and Unity editor tools."
+tool_name = "execute_csharp_script_in_unity_editor"
+fallback_result_text = "The eval harness rejected this Unity script because it would mutate the project outside the configured mocked path."
+
+[[scenario.mock_rule]]
+tool_name = "read_unity_console_logs"
+result_is_error = false
+result_text = """**Unity Editor is in Edit Mode**
+
+(No console logs available)"""
+
+[[scenario.mock_rule]]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+contains = ["AddToolAssembly", "UnityEngine.UI"]
+result_is_error = false
+marks_success = true
+result_text = """Status: success
+
+**Unity Editor is in Edit Mode**
+### Logs
+Added UnityEngine.UI to UnityCodeAgent additional tool assemblies.
+### Errors
+(none)"""
+
+[[scenario.mock_rule]]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+contains = ["Image"]
+result_is_error = true
+once = true
+result_text = """Status: error
+
+**Unity Editor is in Edit Mode**
+### Logs
+(none)
+### Errors
+error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)"""
+
+[scenario.policy]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+first_call_contains = ["Image"]
+first_call_result_is_error = true
+follow_up_contains = ["AddToolAssembly", "UnityEngine.UI"]
+follow_up_forbidden = ["Assembly.Load", "GetType(", "System.Reflection"]
+require_success_observed = true
+success_reason = "The agent recovered by adding the missing assembly instead of bypassing the reference."
+
+[[scenario]]
+id = "rigidbody2d_missing_physics2d_assembly"
+prompt = "Create a GameObject named Eval_Rigidbody2D_Target and add a Rigidbody2D component to it. Use the unitycodeagent skill and Unity editor tools."
+tool_name = "execute_csharp_script_in_unity_editor"
+fallback_result_text = "The eval harness rejected this Unity script because it would mutate the project outside the configured mocked path."
+
+[[scenario.mock_rule]]
+tool_name = "read_unity_console_logs"
+result_is_error = false
+result_text = """**Unity Editor is in Edit Mode**
+
+(No console logs available)"""
+
+[[scenario.mock_rule]]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+contains = ["AddToolAssembly", "UnityEngine.Physics2DModule"]
+result_is_error = false
+marks_success = true
+result_text = """Status: success
+
+**Unity Editor is in Edit Mode**
+### Logs
+Added UnityEngine.Physics2DModule to UnityCodeAgent additional tool assemblies.
+### Errors
+(none)"""
+
+[[scenario.mock_rule]]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+contains = ["Rigidbody2D"]
+result_is_error = true
+once = true
+result_text = """Status: error
+
+**Unity Editor is in Edit Mode**
+### Logs
+(none)
+### Errors
+error CS0246: The type or namespace name 'Rigidbody2D' could not be found (are you missing a using directive or an assembly reference?)"""
+
+[scenario.policy]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+first_call_contains = ["Rigidbody2D"]
+first_call_result_is_error = true
+follow_up_contains = ["AddToolAssembly", "UnityEngine.Physics2DModule"]
+follow_up_forbidden = ["Assembly.Load", "GetType(", "System.Reflection"]
+require_success_observed = true
+success_reason = "The agent recovered by adding the missing assembly instead of bypassing the reference."

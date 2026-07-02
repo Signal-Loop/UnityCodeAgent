@@ -38,15 +38,19 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IHostApplicationLifetime>(),
             sp.GetRequiredService<IHostEnvironment>(),
             sp.GetRequiredService<IOptions<ServiceOptions>>()));
-        services.AddHostedService(sp =>
+        if (!IsNoUnityMode(configuration))
         {
-            var options = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
-            return new ParentProcessMonitor(
-                options.UnityProcessId,
-                TimeSpan.FromSeconds(options.OrphanTimeoutSeconds),
-                sp.GetRequiredService<IHostApplicationLifetime>(),
-                sp.GetRequiredService<IProcessInfoProvider>());
-        });
+            services.AddHostedService(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
+                return new ParentProcessMonitor(
+                    options.UnityProcessId,
+                    TimeSpan.FromSeconds(options.OrphanTimeoutSeconds),
+                    sp.GetRequiredService<IHostApplicationLifetime>(),
+                    sp.GetRequiredService<IProcessInfoProvider>());
+            });
+        }
+
         services.AddHostedService(sp => new ManifestOwnershipMonitor(
             sp.GetRequiredService<ProjectPaths>(),
             sp.GetRequiredService<EndpointManifestStore>(),
@@ -71,4 +75,7 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    private static bool IsNoUnityMode(IConfiguration configuration)
+        => bool.TryParse(configuration[nameof(ServiceOptions.NoUnity)], out var noUnity) && noUnity;
 }

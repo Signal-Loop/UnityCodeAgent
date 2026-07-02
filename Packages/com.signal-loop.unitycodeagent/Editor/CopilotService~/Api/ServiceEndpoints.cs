@@ -1,7 +1,9 @@
 using System.Text;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using SignalLoop.UnityCodeAgent.Contracts;
 using UnityCodeCopilot.Service.Copilot;
+using UnityCodeCopilot.Service.Options;
 using UnityCodeCopilot.Service.Settings;
 using UnityCodeCopilot.Service.Telemetry;
 
@@ -13,6 +15,24 @@ public static class ServiceEndpoints
 
     public static void Map(WebApplication app)
     {
+        app.MapPost("/api/service/stop", (
+            IOptions<ServiceOptions> options,
+            IHostApplicationLifetime applicationLifetime,
+            UnityCodeCopilotServiceLogger log) =>
+        {
+            if (!options.Value.NoUnity)
+            {
+                log.Warning(nameof(ServiceEndpoints), "Service stop request rejected because no-Unity mode is disabled.");
+                return CreateJsonResult(
+                    new AgentServiceErrorResponse("Service self-stop is available only in no-Unity mode.", AgentServiceErrorCodes.OperationFailed),
+                    StatusCodes.Status422UnprocessableEntity);
+            }
+
+            log.Info(nameof(ServiceEndpoints), "Service stop requested in no-Unity mode.");
+            _ = Task.Run(applicationLifetime.StopApplication);
+            return Results.Accepted();
+        });
+
         app.MapGet("/api/sessions", async (IAgentSessionService sessions, UnityCodeCopilotServiceLogger log, CopilotTelemetry telemetry, CancellationToken cancellationToken) =>
         {
             using var operation = StartHttpOperation(telemetry, TelemetryOperations.HttpSessionsList, "/api/sessions");

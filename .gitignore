@@ -101,5 +101,7 @@ ServerSettings.asset
 *.dmp
 *.trx
 .env
+.deepeval/
 .artifacts
+evals/.artifacts/
 .venv/

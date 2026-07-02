@@ -210,6 +210,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentServiceErrorResponse'
+  /api/service/stop:
+    post:
+      operationId: stopService
+      summary: Stop a no-Unity service instance.
+      responses:
+        '202':
+          description: Stop request accepted.
+        '422':
+          description: Service self-stop is available only in no-Unity mode.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentServiceErrorResponse'
+              example:
+                Message: Service self-stop is available only in no-Unity mode.
+                Code: operation_failed
 components:
   schemas:
     HealthResponse:
