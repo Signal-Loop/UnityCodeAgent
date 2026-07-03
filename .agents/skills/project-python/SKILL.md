@@ -14,6 +14,8 @@ description: "Use when creating, editing, or running Python scripts in the Unity
 - Do not add Python project configuration files such as `pyproject.toml`, `requirements.txt`, `setup.py`, `setup.cfg`, or lock files unless the user explicitly asks.
 - Prefer standard library code when practical; add inline dependencies only when they materially simplify the task.
 
+Those rules can be ignored if the user explicitly asks for a different approach.
+
 ## Script Template
 
 ```python

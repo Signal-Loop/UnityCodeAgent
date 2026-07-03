@@ -1,17 +1,37 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "deepeval>=4.0.0",
+#   "httpx>=0.27.0",
+#   "pytest>=8.0.0",
+# ]
+# ///
+
 from __future__ import annotations
 
-import re
-
+import pytest
 from deepeval.test_run.test_run import PromptData, global_test_run_manager
 
-from agent_service_eval import SKILLS_ROOT
+from agent_service_eval import EvalLogger, ManagedAgentService, load_eval_config, select_scenario_cases
 
 
-def pytest_configure(config):
-    for path in SKILLS_ROOT.glob("*/evals/scenarios.toml"):
-        marker = re.sub(r"\W+", "_", path.parent.parent.name).strip("_") or "skill"
-        config.addinivalue_line("markers", f"{marker}: configured skill eval scenarios")
-
+def pytest_addoption(parser):
+    parser.addoption(
+        "--filter",
+        dest="scenario_filter",
+        action="append",
+        default=[],
+        help=(
+            "Skill scenario filter. Use skill_name for all skill scenarios or "
+            "skill_name.scenario_id for one scenario. May be repeated or comma/whitespace-separated."
+        ),
+    )
+    parser.addoption(
+        "--live",
+        action="store_true",
+        default=False,
+        help="Run live evals against a managed no-Unity UnityCodeAgent service.",
+    )
 
 def pytest_sessionfinish(session, exitstatus):
     test_run = global_test_run_manager.get_test_run()
@@ -20,7 +40,9 @@ def pytest_sessionfinish(session, exitstatus):
     test_run.hyperparameters = {
         "eval_harness": "UnityCodeAgent service skill scenarios",
         "runner": "deepeval test run",
-        "selected_marks": session.config.option.markexpr or "all",
+        "scenario_filter": session.config.getoption("scenario_filter") or "all",
+        "live": session.config.getoption("live"),
+        "managed_no_unity_service": session.config.getoption("live"),
     }
     test_run.prompts = [
         PromptData(
@@ -30,3 +52,24 @@ def pytest_sessionfinish(session, exitstatus):
         )
     ]
     global_test_run_manager.save_test_run(global_test_run_manager.temp_file_path)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def managed_no_unity_service(request):
+    if not request.config.getoption("live"):
+        yield
+        return
+
+    scenario_cases = select_scenario_cases(request.config.getoption("scenario_filter"))
+    if not scenario_cases:
+        yield
+        return
+
+    logger = EvalLogger("managed-service")
+    config = load_eval_config(scenario_cases[0].skill_name, logger)
+    service = ManagedAgentService(config, logger)
+    service.start()
+    try:
+        yield
+    finally:
+        service.stop()

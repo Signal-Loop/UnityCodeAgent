@@ -49,6 +49,8 @@ follow_up_forbidden = ["Assembly.Load", "GetType(", "System.Reflection"]
 require_success_observed = true
 success_reason = "The agent recovered by adding the missing assembly instead of bypassing the reference."
 
+
+
 [[scenario]]
 id = "rigidbody2d_missing_physics2d_assembly"
 prompt = "Create a GameObject named Eval_Rigidbody2D_Target and add a Rigidbody2D component to it. Use the unitycodeagent skill and Unity editor tools."

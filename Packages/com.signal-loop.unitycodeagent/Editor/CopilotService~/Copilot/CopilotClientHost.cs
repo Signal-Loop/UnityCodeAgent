@@ -79,10 +79,11 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
     {
         if (_client != null)
         {
+            var client = _client;
             await _telemetry.ExecuteAsync(TelemetryOperations.SdkClientStop, async _ =>
             {
                 _log.Info(nameof(CopilotClientHost), "Stopping Copilot client host.");
-                await _client.DisposeAsync();
+                await client.StopAsync();
                 _client = null;
                 _log.Info(nameof(CopilotClientHost), "Copilot client host stopped.");
             });
@@ -253,8 +254,21 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
         if (_client != null)
         {
             _log.Info(nameof(CopilotClientHost), "Disposing Copilot client host.");
-            await _client.DisposeAsync();
-            _client = null;
+            try
+            {
+                await StopAsync(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                var client = _client;
+                _log.Error(nameof(CopilotClientHost), "Graceful Copilot client host disposal failed; force-disposing client.", exception);
+                if (client != null)
+                {
+                    await client.DisposeAsync();
+                    _client = null;
+                    _log.Info(nameof(CopilotClientHost), "Copilot client host force-disposed.");
+                }
+            }
         }
     }
 
