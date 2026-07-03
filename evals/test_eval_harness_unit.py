@@ -1,35 +1,28 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#   "deepeval>=4.0.0",
-#   "httpx>=0.27.0",
-#   "pytest>=8.0.0",
-# ]
-# ///
-
 from __future__ import annotations
 
 import json
 import os
 import threading
-import pytest
 from pathlib import Path
-from types import SimpleNamespace
+from typing import Any
 
-import agent_service_eval as harness
 import httpx
+import pytest
 from deepeval import assert_test
 from deepeval.test_case import LLMTestCase
 
-from agent_service_eval import (
+import unitycodeagent_evals.runner as runner_harness
+from metrics import HARNESS_CONFIG_METRICS, TOOL_SEQUENCE_POLICY_METRICS
+from unitycodeagent_evals import (
+    ROOT,
     AgentServiceClient,
     EvalLogger,
     ManagedAgentService,
     MockRule,
-    ROOT,
     Scenario,
     ScenarioCase,
     TelemetryConfig,
+    ToolCall,
     build_diagnostics,
     filter_scenario_cases,
     load_eval_config,
@@ -38,8 +31,6 @@ from agent_service_eval import (
     parse_telemetry_config,
     run_scenario,
 )
-from metrics import HARNESS_CONFIG_METRICS, TOOL_SEQUENCE_POLICY_METRICS
-
 
 SKILL_NAME = "unitycodeagent"
 UNIT_LOGGER = EvalLogger("eval-harness-unit")
@@ -254,7 +245,7 @@ def test_client_send_prompt_waits_for_assistant_message_and_session_idle():
                     "Type": event_type,
                     "Content": content,
                 }
-                yield f"data: {json.dumps(payload)}\n\n".encode("utf-8")
+                yield f"data: {json.dumps(payload)}\n\n".encode()
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/events":
@@ -290,7 +281,7 @@ def test_client_send_prompt_can_return_after_assistant_response_when_idle_times_
                 "Type": "AssistantMessage",
                 "Content": "Preflight response.",
             }
-            yield f"data: {json.dumps(payload)}\n\n".encode("utf-8")
+            yield f"data: {json.dumps(payload)}\n\n".encode()
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/events":
@@ -366,8 +357,8 @@ def test_run_scenario_returns_when_session_idle_is_observed(monkeypatch):
         def raise_if_failed(self):
             pass
 
-    monkeypatch.setattr(harness, "AgentServiceClient", FakeClient)
-    monkeypatch.setattr(harness, "SseTraceCapture", FakeCapture)
+    monkeypatch.setattr(runner_harness, "DefaultAgentServiceClient", FakeClient)
+    monkeypatch.setattr(runner_harness, "DefaultSseTraceCapture", FakeCapture)
 
     run = run_scenario(config, scenario, UNIT_LOGGER)
 
@@ -379,17 +370,19 @@ def test_run_scenario_returns_when_session_idle_is_observed(monkeypatch):
 def test_build_diagnostics_includes_source_event_type_and_content_length():
     config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
     scenario = make_scenario_case(SKILL_NAME, "diagnostics").scenario
-    capture = SimpleNamespace(
-        events=[
+
+    class DiagnosticsCapture:
+        events: list[dict[str, Any]] = [
             {
                 "SessionId": "diagnostics-session",
                 "Type": "AssistantMessage",
                 "Content": "hello",
                 "SourceJson": json.dumps({"type": "assistant.message"}),
             }
-        ],
-        tool_calls=[],
-    )
+        ]
+        tool_calls: list[ToolCall] = []
+
+    capture = DiagnosticsCapture()
 
     diagnostics = build_diagnostics(config, UNIT_LOGGER, capture, scenario, "diagnostic check")
 

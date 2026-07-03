@@ -2,6 +2,34 @@
 
 This folder contains reusable DeepEval harness code and committed pytest evals for agent, skill, and tool behavior.
 
+## Project Setup
+
+The eval harness is managed as its own Python project from this `evals/` directory.
+
+```powershell
+cd evals
+uv sync
+uv lock
+```
+
+Use `uv run --env-file .env ...` for checks that need the repository root `.env`. On Windows, keep `PYTHONUTF8=1` in `.env` so DeepEval/Rich output uses UTF-8 from interpreter startup.
+
+## Module Layout
+
+Harness code lives under `unitycodeagent_evals/`:
+
+- `paths.py`: repository paths and managed-service context.
+- `models.py`: shared dataclasses for config, scenarios, tool calls, and scenario runs.
+- `env.py`: `.env` parsing/loading.
+- `config.py`: TOML loading, service URL resolution, and scenario loading.
+- `scenario_selection.py`: skill/scenario discovery and filter handling.
+- `artifacts.py`: `EvalLogger` and JSONL/summary artifact writing.
+- `client.py`: Agent Service HTTP and wait-for-SSE helpers.
+- `sse.py`: live SSE trace capture and tool invocation parsing.
+- `mock_tools.py`: mock tool response routing.
+- `runner.py`: scenario orchestration and diagnostics.
+- `managed_service.py`: no-Unity service process lifecycle.
+
 ## What Runs
 
 Live evals start a managed no-Unity UnityCodeAgent service and use the real service endpoints:
@@ -14,11 +42,9 @@ Live evals start a managed no-Unity UnityCodeAgent service and use the real serv
 
 The harness intercepts `ToolInvocationRequest` SSE events and posts mocked tool results back to the service, so Unity project files and settings are not modified.
 
-Live runs write diagnostics under `evals/.artifacts/<skill>/<run_id>/`, including `events.jsonl` and `summary.json`. The managed service writes its endpoint manifest, logs, stdout/stderr, and default telemetry file under `evals/.artifacts/managed-service/<run_id>/`. These files are local artifacts and are ignored by git.
+Live runs write diagnostics under `.artifacts/<skill>/<run_id>/`, including `events.jsonl` and `summary.json`. The managed service writes its endpoint manifest, logs, stdout/stderr, and default telemetry file under `.artifacts/managed-service/<run_id>/`. These files are local artifacts and are ignored by git.
 
 Provider keys are loaded from the repository root `.env` first, then from an optional skill-local `<skill>/evals/.env`. Secret values are never printed; diagnostics only report whether the configured key is present.
-
-On Windows, add `PYTHONUTF8=1` to the root `.env` and pass `--env-file .env` to `uv run`. DeepEval/Rich prints Unicode status glyphs, and Python must enter UTF-8 mode before the interpreter starts.
 
 ## `config.toml` Reference
 
@@ -236,50 +262,52 @@ success_reason = "The agent recovered by adding the missing assembly."
 Run fast checks before live scenarios:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest python -m compileall evals
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_eval_harness_unit.py --identifier "eval-harness-generic"
+cd evals
+uv run --env-file .env python -m compileall conftest.py metrics.py test_eval_harness_unit.py test_live_preflight.py test_skill_scenarios.py unitycodeagent_evals
+uv run ruff check .
+uv run --env-file .env deepeval test run test_eval_harness_unit.py --identifier "eval-harness-generic"
 ```
 
 Run the live preflight before full scenarios. The suite starts `UnityCodeCopilot.Service` with `--NoUnity=true`, waits for `/health`, and stops it through `POST /api/service/stop` after the run:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_live_preflight.py --identifier "eval-live-preflight" -- --live
+uv run --env-file .env deepeval test run test_live_preflight.py --identifier "eval-live-preflight" -- --live
 ```
 
 Collect the current suite without live execution. The scenarios are collected, then skipped because `--live` is omitted:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_skill_scenarios.py --identifier "all-scenarios"
+uv run --env-file .env deepeval test run test_skill_scenarios.py --identifier "all-scenarios"
 ```
 
 Run every configured live scenario with provider credentials:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_skill_scenarios.py --identifier "all-live" -- --live
+uv run --env-file .env deepeval test run test_skill_scenarios.py --identifier "all-live" -- --live
 ```
 
 Run every live scenario for one skill:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_skill_scenarios.py --identifier "unitycodeagent-live" -- --live --filter unitycodeagent
+uv run --env-file .env deepeval test run test_skill_scenarios.py --identifier "unitycodeagent-live" -- --live --filter unitycodeagent
 ```
 
 Run every live scenario for multiple skills:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_skill_scenarios.py --identifier "selected-skills" -- --live --filter unitycodeagent,other_skill
+uv run --env-file .env deepeval test run test_skill_scenarios.py --identifier "selected-skills" -- --live --filter unitycodeagent,other_skill
 ```
 
 Run one exact live scenario:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_skill_scenarios.py --identifier "image-scenario" -- --live --filter unitycodeagent.image_missing_ui_assembly
+uv run --env-file .env deepeval test run test_skill_scenarios.py --identifier "image-scenario" -- --live --filter unitycodeagent.image_missing_ui_assembly
 ```
 
 Run multiple exact live scenarios:
 
 ```powershell
-uv run --env-file .env --with deepeval --with httpx --with pytest deepeval test run evals/test_skill_scenarios.py --identifier "selected-scenarios" -- --live --filter unitycodeagent.image_missing_ui_assembly,unitycodeagent.rigidbody2d_missing_physics2d_assembly
+uv run --env-file .env deepeval test run test_skill_scenarios.py --identifier "selected-scenarios" -- --live --filter unitycodeagent.image_missing_ui_assembly,unitycodeagent.rigidbody2d_missing_physics2d_assembly
 ```
 
 The `--filter` and `--live` arguments are pytest-side options, so pass them after DeepEval's `--` separator. The `--identifier` argument is a DeepEval run label used for output/reporting; it does not select tests.

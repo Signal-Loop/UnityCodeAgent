@@ -1,12 +1,3 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#   "deepeval>=4.0.0",
-#   "httpx>=0.27.0",
-#   "pytest>=8.0.0",
-# ]
-# ///
-
 from __future__ import annotations
 
 import json
@@ -18,9 +9,8 @@ import pytest
 from deepeval import assert_test
 from deepeval.test_case import LLMTestCase
 
-from agent_service_eval import AgentServiceClient, EvalConfig, EvalLogger, load_eval_config
 from metrics import HARNESS_CONFIG_METRICS
-
+from unitycodeagent_evals import AgentServiceClient, EvalConfig, EvalLogger, load_eval_config
 
 SKILL_NAME = "unitycodeagent"
 

@@ -1,20 +1,11 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#   "deepeval>=4.0.0",
-#   "httpx>=0.27.0",
-#   "pytest>=8.0.0",
-# ]
-# ///
-
 from __future__ import annotations
 
 import pytest
 from deepeval import assert_test
 from deepeval.test_case import LLMTestCase
 
-from agent_service_eval import EvalLogger, load_eval_config, run_scenario, select_scenario_cases
 from metrics import TOOL_SEQUENCE_POLICY_METRICS
+from unitycodeagent_evals import EvalLogger, load_eval_config, run_scenario, select_scenario_cases
 
 
 def pytest_generate_tests(metafunc):

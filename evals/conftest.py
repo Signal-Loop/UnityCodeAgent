@@ -1,18 +1,9 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#   "deepeval>=4.0.0",
-#   "httpx>=0.27.0",
-#   "pytest>=8.0.0",
-# ]
-# ///
-
 from __future__ import annotations
 
 import pytest
 from deepeval.test_run.test_run import PromptData, global_test_run_manager
 
-from agent_service_eval import EvalLogger, ManagedAgentService, load_eval_config, select_scenario_cases
+from unitycodeagent_evals import EvalLogger, ManagedAgentService, load_eval_config, select_scenario_cases
 
 
 def pytest_addoption(parser):

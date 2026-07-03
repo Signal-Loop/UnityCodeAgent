@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from deepeval.metrics import BaseMetric
 from deepeval.test_case import LLMTestCase
+
+
+def _load_json_object(value: str | None, field_name: str) -> dict[str, Any]:
+    if value is None:
+        raise ValueError(f"DeepEval test case {field_name} was not set.")
+    parsed = json.loads(value)
+    if not isinstance(parsed, dict):
+        raise ValueError(f"DeepEval test case {field_name} must contain a JSON object.")
+    return cast(dict[str, Any], parsed)
 
 
 class HarnessConfigMetric(BaseMetric):
@@ -17,17 +26,18 @@ class HarnessConfigMetric(BaseMetric):
 
     def measure(self, test_case: LLMTestCase) -> float:
         try:
-            actual = json.loads(test_case.actual_output)
-            expected = json.loads(test_case.expected_output)
+            actual = _load_json_object(test_case.actual_output, "actual_output")
+            expected = _load_json_object(test_case.expected_output, "expected_output")
             mismatches = [key for key, expected_value in expected.items() if actual.get(key) != expected_value]
             if mismatches:
-                self.score = 0.0
+                score = 0.0
                 self.reason = f"Config values did not match expected fields: {', '.join(mismatches)}"
             else:
-                self.score = 1.0
+                score = 1.0
                 self.reason = "Eval harness config and committed scenarios loaded as expected."
-            self.success = self.score >= self.threshold
-            return self.score
+            self.score = score
+            self.success = score >= self.threshold
+            return score
         except Exception as error:
             self.error = str(error)
             raise
@@ -39,11 +49,11 @@ class HarnessConfigMetric(BaseMetric):
         if self.error is not None:
             self.success = False
         else:
-            self.success = self.score >= self.threshold
+            self.success = (self.score or 0.0) >= self.threshold
         return self.success
 
     @property
-    def __name__(self) -> str:
+    def __name__(self) -> str:  # type: ignore[reportIncompatibleMethodOverride]
         return "Harness Config"
 
 
@@ -57,11 +67,13 @@ class ToolSequencePolicyMetric(BaseMetric):
 
     def measure(self, test_case: LLMTestCase) -> float:
         try:
-            payload = json.loads(test_case.actual_output)
-            expected = json.loads(test_case.expected_output)
-            self.score, self.reason = self._score(payload, expected)
-            self.success = self.score >= self.threshold
-            return self.score
+            payload = _load_json_object(test_case.actual_output, "actual_output")
+            expected = _load_json_object(test_case.expected_output, "expected_output")
+            score, reason = self._score(payload, expected)
+            self.score = score
+            self.reason = reason
+            self.success = score >= self.threshold
+            return score
         except Exception as error:
             self.error = str(error)
             raise
@@ -73,11 +85,11 @@ class ToolSequencePolicyMetric(BaseMetric):
         if self.error is not None:
             self.success = False
         else:
-            self.success = self.score >= self.threshold
+            self.success = (self.score or 0.0) >= self.threshold
         return self.success
 
     @property
-    def __name__(self) -> str:
+    def __name__(self) -> str:  # type: ignore[reportIncompatibleMethodOverride]
         return "Tool Sequence Policy"
 
     def _score(self, payload: dict[str, Any], expected: dict[str, Any]) -> tuple[float, str]:
@@ -120,5 +132,5 @@ def _argument_text(call: dict[str, Any], argument_name: str) -> str:
     return value if isinstance(value, str) else ""
 
 
-HARNESS_CONFIG_METRICS = [HarnessConfigMetric()]
-TOOL_SEQUENCE_POLICY_METRICS = [ToolSequencePolicyMetric()]
+HARNESS_CONFIG_METRICS: list[BaseMetric] = [HarnessConfigMetric()]
+TOOL_SEQUENCE_POLICY_METRICS: list[BaseMetric] = [ToolSequencePolicyMetric()]
