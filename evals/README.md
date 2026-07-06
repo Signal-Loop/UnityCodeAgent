@@ -175,6 +175,7 @@ Each `[[scenario]]` entry describes one live or mocked scenario for the skill.
 | `id` | string | required | Stable scenario identifier used in test output and metrics. |
 | `prompt` | string | required | User prompt sent to the agent. |
 | `tool_name` | string | empty | Primary tool the scenario expects the agent to use. |
+| `max_tool_calls` | integer | `10` | Maximum captured tool calls before the harness stops the scenario as failed to protect against tool-call loops. |
 | `fallback_result_is_error` | bool | `true` | Result flag used when the harness rejects an unmatched tool call. |
 | `fallback_result_text` | string | harness default text | Message returned when no mock rule matches the tool call. |
 
@@ -187,6 +188,7 @@ Minimal example:
 id = "example_missing_assembly"
 prompt = "Add a Rigidbody2D component to a GameObject."
 tool_name = "execute_csharp_script_in_unity_editor"
+max_tool_calls = 10
 fallback_result_text = "No mock rule matched this tool call."
 ```
 
@@ -201,7 +203,6 @@ fallback_result_text = "No mock rule matched this tool call."
 | `contains` | array[string] | empty | All strings must appear in the target argument value for the rule to match. |
 | `result_is_error` | bool | `false` | Whether the mocked tool result is treated as an error. |
 | `result_text` | string | empty | Mock response text returned to the agent. |
-| `marks_success` | bool | `false` | Marks the scenario as successful once this rule matches. |
 | `once` | bool | `false` | Consumes the rule after the first match. |
 
 Matching behavior:
@@ -226,37 +227,55 @@ result_text = "error CS0246: Rigidbody2D could not be found"
 
 ### `scenario.policy`
 
-`[scenario.policy]` defines the expected recovery pattern for the eval metric.
+`[scenario.policy]` defines the expected tool sequence for the eval metric. The metric scores captured `tool_calls` against `[[scenario.policy.expected_tool]]` entries.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `tool_name` | string | Tool expected in the policy check. If omitted, the scenario `tool_name` is used. |
-| `argument_name` | string, optional | Argument field checked for matching text. |
-| `first_call_contains` | array[string] | Text expected in the first tool call. |
-| `first_call_result_is_error` | bool | Whether the first call is expected to fail. |
-| `follow_up_contains` | array[string] | Text expected in the recovery call. |
-| `follow_up_forbidden` | array[string] | Text that must not appear in the recovery call. |
-| `require_success_observed` | bool | Requires the scenario to record a success event. |
+| `threshold` | number | Minimum score required to pass. Defaults to `1.0`. |
+| `should_consider_ordering` | bool | When `true`, expected calls are scored by ordered longest common subsequence. Defaults to `false`. |
+| `should_exact_match` | bool | When `true`, actual and expected calls must have identical length and order. This takes precedence over ordering. Defaults to `false`. |
 | `success_reason` | string | Human-readable reason recorded when the recovery succeeds. |
+
+Each `[[scenario.policy.expected_tool]]` entry supports:
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `tool_name` | string | Tool expected in the policy check. |
+| `argument_name` | string, optional | Argument field checked for matching text. Defaults to `script`. |
+| `arguments_contain` | array[string] | Text that must appear in the selected argument. |
+| `arguments_forbid` | array[string] | Text that must not appear in the selected argument. |
+| `result_is_error` | bool, optional | Expected tool result error flag. |
+| `required` | bool | If `true`, the scenario fails when no matching actual call exists, regardless of threshold. |
 
 The current scenarios are all recovery scenarios:
 
 - The first call intentionally fails because the needed Unity assembly is missing.
 - The agent is expected to recover by adding the missing assembly.
 - The follow-up call must avoid reflection-based workarounds such as `Assembly.Load`, `GetType(`, or `System.Reflection`.
+- The scenario stops as failed if captured tool calls reach `max_tool_calls` before the service becomes idle.
 
 Example:
 
 ```toml
 [scenario.policy]
+threshold = 1.0
+should_consider_ordering = true
+should_exact_match = false
+success_reason = "The agent recovered by adding the missing assembly."
+
+[[scenario.policy.expected_tool]]
 tool_name = "execute_csharp_script_in_unity_editor"
 argument_name = "script"
-first_call_contains = ["Rigidbody2D"]
-first_call_result_is_error = true
-follow_up_contains = ["AddToolAssembly", "UnityEngine.Physics2DModule"]
-follow_up_forbidden = ["Assembly.Load", "GetType(", "System.Reflection"]
-require_success_observed = true
-success_reason = "The agent recovered by adding the missing assembly."
+arguments_contain = ["Rigidbody2D"]
+result_is_error = true
+
+[[scenario.policy.expected_tool]]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+arguments_contain = ["AddToolAssembly", "UnityEngine.Physics2DModule"]
+arguments_forbid = ["Assembly.Load", "GetType(", "System.Reflection"]
+result_is_error = false
+required = true
 ```
 
 ## Run Checks

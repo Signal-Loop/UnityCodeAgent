@@ -100,8 +100,8 @@ Every implementation plan must include a concise C4 change diagram suite in Plan
 
 - Required: System Context, Container, Component, and Code views.
 - Use PlantUML C4 macros such as `C4Context`, `C4Container`, and `C4Component` where possible.
-- Use a simple PlantUML class diagram for the Code view when C4 macros are not appropriate.
-- Use PlantUML sequence or activity diagrams for dynamic behavior when the task changes a runtime flow, adds a feature, or alters an existing flow.
+- Use a simple Mermaid class diagram for the Code view.
+- Use Mermaid sequence or activity diagrams for dynamic behavior when the task changes a runtime flow, adds a feature, or alters an existing flow.
 - Label meaningful new, changed, removed, and unchanged elements.
 - Keep diagrams task-scoped; write "No change" for required views with no impact.
 

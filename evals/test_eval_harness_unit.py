@@ -11,6 +11,7 @@ import pytest
 from deepeval import assert_test
 from deepeval.test_case import LLMTestCase
 
+import unitycodeagent_evals.config as config_harness
 import unitycodeagent_evals.runner as runner_harness
 from metrics import HARNESS_CONFIG_METRICS, TOOL_SEQUENCE_POLICY_METRICS
 from unitycodeagent_evals import (
@@ -52,6 +53,7 @@ def make_scenario_case(skill_name: str, scenario_id: str) -> ScenarioCase:
             id=scenario_id,
             prompt=f"Prompt for {scenario_id}",
             tool_name="execute_csharp_script_in_unity_editor",
+            max_tool_calls=10,
             mock_rules=(
                 MockRule(
                     tool_name="execute_csharp_script_in_unity_editor",
@@ -59,11 +61,19 @@ def make_scenario_case(skill_name: str, scenario_id: str) -> ScenarioCase:
                     contains=("success",),
                     result_is_error=False,
                     result_text="ok",
-                    marks_success=True,
                     once=False,
                 ),
             ),
-            policy={"tool_name": "execute_csharp_script_in_unity_editor"},
+            policy={
+                "threshold": 1.0,
+                "expected_tool": [
+                    {
+                        "tool_name": "execute_csharp_script_in_unity_editor",
+                        "argument_name": "script",
+                        "arguments_contain": ["success"],
+                    }
+                ],
+            },
             fallback_result_is_error=True,
             fallback_result_text="fallback",
         ),
@@ -182,6 +192,47 @@ def test_eval_config_loads_committed_scenarios():
     )
 
     assert_test(test_case, HARNESS_CONFIG_METRICS)
+
+
+def test_load_scenarios_defaults_max_tool_calls_to_ten(tmp_path, monkeypatch):
+    scenario_dir = tmp_path / "sample" / "evals"
+    scenario_dir.mkdir(parents=True)
+    (scenario_dir / "scenarios.toml").write_text(
+        """
+[[scenario]]
+id = "default-max"
+prompt = "Prompt"
+tool_name = "execute_csharp_script_in_unity_editor"
+
+[scenario.policy]
+threshold = 1.0
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_harness, "SKILLS_ROOT", tmp_path)
+
+    scenarios = load_scenarios("sample")
+
+    assert scenarios[0].max_tool_calls == 10
+
+
+def test_load_scenarios_rejects_non_positive_max_tool_calls(tmp_path, monkeypatch):
+    scenario_dir = tmp_path / "sample" / "evals"
+    scenario_dir.mkdir(parents=True)
+    (scenario_dir / "scenarios.toml").write_text(
+        """
+[[scenario]]
+id = "invalid-max"
+prompt = "Prompt"
+tool_name = "execute_csharp_script_in_unity_editor"
+max_tool_calls = 0
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_harness, "SKILLS_ROOT", tmp_path)
+
+    with pytest.raises(ValueError, match="max_tool_calls must be a positive integer"):
+        load_scenarios("sample")
 
 
 def test_managed_service_startup_config_does_not_require_endpoint_manifest():
@@ -393,9 +444,149 @@ def test_run_scenario_returns_when_session_idle_is_observed(monkeypatch):
 
     run = run_scenario(config, scenario, UNIT_LOGGER)
 
-    assert run.success_observed is False
-    assert run.reason == "Session became idle before the configured success mock rule was observed."
+    assert run.reason == "Session became idle."
+    assert run.failed is False
     assert run.diagnostics["session_event_types_tail"] == ["SessionIdle"]
+
+
+def test_run_scenario_stops_when_max_tool_calls_is_reached(monkeypatch):
+    scenario = make_scenario_case(SKILL_NAME, "max-tool-calls").scenario
+    scenario = Scenario(
+        id=scenario.id,
+        prompt=scenario.prompt,
+        tool_name=scenario.tool_name,
+        max_tool_calls=1,
+        mock_rules=scenario.mock_rules,
+        policy=scenario.policy,
+        fallback_result_is_error=scenario.fallback_result_is_error,
+        fallback_result_text=scenario.fallback_result_text,
+    )
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
+
+    class FakeClient:
+        def __init__(self, config, logger):
+            self.config = config
+            self.logger = logger
+
+        get_source_event_type = staticmethod(AgentServiceClient.get_source_event_type)
+
+        def create_session(self, session_id):
+            pass
+
+        def send_prompt(self, session_id, prompt):
+            pass
+
+        def post_tool_result(self, completed, is_error, text):
+            pass
+
+        def abort(self, session_id):
+            pass
+
+        def close(self):
+            pass
+
+    class FakeCapture:
+        def __init__(self, client, session_id, on_tool_call, logger):
+            self.client = client
+            self.session_id = session_id
+            self.on_tool_call = on_tool_call
+            self.logger = logger
+            self.events = []
+            self.tool_calls = []
+
+        def start(self):
+            call = ToolCall(
+                call_id="call-1",
+                session_id=self.session_id,
+                tool_name="execute_csharp_script_in_unity_editor",
+                arguments_json=json.dumps({"script": "success"}),
+                arguments={"script": "success"},
+            )
+            self.tool_calls.append(self.on_tool_call(call))
+
+        def stop(self):
+            pass
+
+        def raise_if_failed(self):
+            pass
+
+    monkeypatch.setattr(runner_harness, "DefaultAgentServiceClient", FakeClient)
+    monkeypatch.setattr(runner_harness, "DefaultSseTraceCapture", FakeCapture)
+
+    run = run_scenario(config, scenario, UNIT_LOGGER)
+
+    assert run.reason == "Stopped after reaching the scenario max tool call limit of 1."
+    assert run.failed is True
+    assert len(run.diagnostics["tool_calls"]) == 1
+
+
+def test_run_scenario_does_not_end_when_mock_rule_matches(monkeypatch):
+    scenario = make_scenario_case(SKILL_NAME, "mock-rule-does-not-end").scenario
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
+
+    class FakeClient:
+        def __init__(self, config, logger):
+            self.config = config
+            self.logger = logger
+
+        get_source_event_type = staticmethod(AgentServiceClient.get_source_event_type)
+
+        def create_session(self, session_id):
+            pass
+
+        def send_prompt(self, session_id, prompt):
+            pass
+
+        def post_tool_result(self, completed, is_error, text):
+            pass
+
+        def abort(self, session_id):
+            pass
+
+        def close(self):
+            pass
+
+    class FakeCapture:
+        def __init__(self, client, session_id, on_tool_call, logger):
+            self.client = client
+            self.session_id = session_id
+            self.on_tool_call = on_tool_call
+            self.logger = logger
+            self.events = []
+            self.tool_calls = []
+
+        def start(self):
+            call = ToolCall(
+                call_id="call-1",
+                session_id=self.session_id,
+                tool_name="execute_csharp_script_in_unity_editor",
+                arguments_json=json.dumps({"script": "success"}),
+                arguments={"script": "success"},
+            )
+            self.tool_calls.append(self.on_tool_call(call))
+            self.events.append(
+                {
+                    "SessionId": self.session_id,
+                    "Type": "SessionIdle",
+                    "Content": "Session became idle.",
+                    "SourceJson": json.dumps({"type": "session.idle"}),
+                }
+            )
+
+        def stop(self):
+            pass
+
+        def raise_if_failed(self):
+            pass
+
+    monkeypatch.setattr(runner_harness, "DefaultAgentServiceClient", FakeClient)
+    monkeypatch.setattr(runner_harness, "DefaultSseTraceCapture", FakeCapture)
+
+    run = run_scenario(config, scenario, UNIT_LOGGER)
+
+    assert run.reason == "Session became idle."
+    assert run.failed is False
+    assert len(run.tool_calls) == 1
 
 
 def test_build_diagnostics_includes_source_event_type_and_content_length():
@@ -465,29 +656,40 @@ def test_telemetry_otlp_endpoint_maps_to_service_argument_without_file_path_argu
     assert not any(argument.startswith("--TelemetryFilePath") for argument in command)
 
 
+def assert_tool_policy(actual: dict[str, Any], expected: dict[str, Any], expected_success: bool, expected_score: float) -> None:
+    metric = TOOL_SEQUENCE_POLICY_METRICS[0]
+    test_case = LLMTestCase(
+        input="Check tool sequence policy.",
+        actual_output=json.dumps(actual),
+        expected_output=json.dumps(expected),
+    )
+
+    score = metric.measure(test_case)
+
+    assert score == pytest.approx(expected_score)
+    assert metric.is_successful() is expected_success
+
+
 def test_tool_sequence_policy_metric_accepts_configured_recovery_sequence():
     UNIT_LOGGER.log("scenario_metric_test_start", skill_name=SKILL_NAME)
     scenario = load_scenarios(SKILL_NAME)[0]
     policy = scenario.policy
-    tool_name = policy["tool_name"]
-    first_contains = policy["first_call_contains"][0]
-    follow_up_contains = policy["follow_up_contains"]
+    first_expected, follow_up_expected = policy["expected_tool"]
 
     test_case = LLMTestCase(
         input=scenario.prompt,
         actual_output=json.dumps(
             {
-                "success_observed": True,
                 "tool_calls": [
                     {
-                        "tool_name": tool_name,
-                        "arguments": {"script": f"using UnityEngine.UI;\nvar component = go.AddComponent<{first_contains}>();"},
+                        "tool_name": first_expected["tool_name"],
+                        "arguments": {"script": f"using UnityEngine.UI;\nvar component = go.AddComponent<{first_expected['arguments_contain'][0]}>();"},
                         "result_is_error": True,
                         "result_text": "mocked missing assembly error",
                     },
                     {
-                        "tool_name": tool_name,
-                        "arguments": {"script": " ".join(follow_up_contains)},
+                        "tool_name": follow_up_expected["tool_name"],
+                        "arguments": {"script": " ".join(follow_up_expected["arguments_contain"])},
                         "result_is_error": False,
                         "result_text": "mocked recovery success",
                     },
@@ -498,3 +700,162 @@ def test_tool_sequence_policy_metric_accepts_configured_recovery_sequence():
     )
 
     assert_test(test_case, TOOL_SEQUENCE_POLICY_METRICS)
+
+
+def test_tool_sequence_policy_metric_allows_optional_partial_match_above_threshold():
+    actual = {
+        "tool_calls": [
+            {
+                "tool_name": "execute_csharp_script_in_unity_editor",
+                "arguments": {"script": "AddToolAssembly UnityEngine.UI"},
+                "result_is_error": False,
+            }
+        ]
+    }
+    expected = {
+        "threshold": 0.5,
+        "expected_tool": [
+            {
+                "tool_name": "execute_csharp_script_in_unity_editor",
+                "arguments_contain": ["AddToolAssembly"],
+            },
+            {
+                "tool_name": "read_unity_console_logs",
+            },
+        ],
+    }
+
+    assert_tool_policy(actual, expected, True, 0.5)
+
+
+def test_tool_sequence_policy_metric_missing_required_call_fails_regardless_of_threshold():
+    actual = {
+        "tool_calls": [
+            {
+                "tool_name": "execute_csharp_script_in_unity_editor",
+                "arguments": {"script": "AddComponent<Image>()"},
+                "result_is_error": True,
+            }
+        ]
+    }
+    expected = {
+        "threshold": 0.1,
+        "expected_tool": [
+            {
+                "tool_name": "execute_csharp_script_in_unity_editor",
+                "arguments_contain": ["AddToolAssembly"],
+                "required": True,
+            }
+        ],
+    }
+
+    assert_tool_policy(actual, expected, False, 0.0)
+
+
+def test_tool_sequence_policy_metric_failed_run_fails_even_when_calls_match():
+    actual = {
+        "failed": True,
+        "reason": "Stopped after reaching the scenario max tool call limit of 1.",
+        "tool_calls": [
+            {
+                "tool_name": "execute_csharp_script_in_unity_editor",
+                "arguments": {"script": "AddToolAssembly UnityEngine.UI"},
+                "result_is_error": False,
+            }
+        ],
+    }
+    expected = {
+        "threshold": 1.0,
+        "expected_tool": [
+            {
+                "tool_name": "execute_csharp_script_in_unity_editor",
+                "arguments_contain": ["AddToolAssembly"],
+            }
+        ],
+    }
+
+    assert_tool_policy(actual, expected, False, 0.0)
+
+
+def test_tool_sequence_policy_metric_ignores_order_when_ordering_is_false():
+    actual = {
+        "tool_calls": [
+            {"tool_name": "second", "arguments": {"script": "B"}, "result_is_error": False},
+            {"tool_name": "first", "arguments": {"script": "A"}, "result_is_error": False},
+        ]
+    }
+    expected = {
+        "threshold": 1.0,
+        "should_consider_ordering": False,
+        "expected_tool": [
+            {"tool_name": "first", "arguments_contain": ["A"]},
+            {"tool_name": "second", "arguments_contain": ["B"]},
+        ],
+    }
+
+    assert_tool_policy(actual, expected, True, 1.0)
+
+
+def test_tool_sequence_policy_metric_penalizes_out_of_order_calls_when_ordering_is_true():
+    actual = {
+        "tool_calls": [
+            {"tool_name": "second", "arguments": {"script": "B"}, "result_is_error": False},
+            {"tool_name": "first", "arguments": {"script": "A"}, "result_is_error": False},
+        ]
+    }
+    expected = {
+        "threshold": 1.0,
+        "should_consider_ordering": True,
+        "expected_tool": [
+            {"tool_name": "first", "arguments_contain": ["A"]},
+            {"tool_name": "second", "arguments_contain": ["B"]},
+        ],
+    }
+
+    assert_tool_policy(actual, expected, False, 0.5)
+
+
+def test_tool_sequence_policy_metric_exact_match_rejects_extra_missing_or_reordered_calls():
+    expected = {
+        "threshold": 1.0,
+        "should_consider_ordering": True,
+        "should_exact_match": True,
+        "expected_tool": [
+            {"tool_name": "first", "arguments_contain": ["A"]},
+            {"tool_name": "second", "arguments_contain": ["B"]},
+        ],
+    }
+
+    assert_tool_policy(
+        {
+            "tool_calls": [
+                {"tool_name": "first", "arguments": {"script": "A"}},
+                {"tool_name": "second", "arguments": {"script": "B"}},
+                {"tool_name": "third", "arguments": {"script": "C"}},
+            ]
+        },
+        expected,
+        False,
+        0.0,
+    )
+    assert_tool_policy(
+        {
+            "tool_calls": [
+                {"tool_name": "first", "arguments": {"script": "A"}},
+            ]
+        },
+        expected,
+        False,
+        0.0,
+    )
+    assert_tool_policy(
+        {
+            "tool_calls": [
+                {"tool_name": "second", "arguments": {"script": "B"}},
+                {"tool_name": "first", "arguments": {"script": "A"}},
+            ]
+        },
+        expected,
+        False,
+        0.0,
+    )

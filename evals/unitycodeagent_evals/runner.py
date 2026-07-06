@@ -37,7 +37,7 @@ def run_scenario(config: EvalConfig, scenario: Scenario, logger: EvalLogger | No
         return completed
 
     capture = DefaultSseTraceCapture(client, session_id, on_tool_call, logger)
-    reason = "Timed out before the configured success mock rule was observed."
+    reason = "Timed out before the scenario reached a terminal service state."
     try:
         if logger:
             logger.log("scenario_start", scenario_id=scenario.id, session_id=session_id)
@@ -54,16 +54,16 @@ def run_scenario(config: EvalConfig, scenario: Scenario, logger: EvalLogger | No
                 last_progress_at = time.monotonic()
                 last_event_count = len(capture.events)
                 last_tool_count = len(capture.tool_calls)
-            if router.success_observed:
-                reason = "The configured success mock rule was observed."
+            if len(capture.tool_calls) >= scenario.max_tool_calls:
+                reason = f"Stopped after reaching the scenario max tool call limit of {scenario.max_tool_calls}."
                 run = ScenarioRun(scenario, session_id, capture.events, capture.tool_calls, True, reason, {})
                 run.diagnostics = build_diagnostics(config, logger, capture, scenario, reason)
                 if logger:
-                    logger.log("scenario_success", scenario_id=scenario.id, session_id=session_id)
+                    logger.log("scenario_max_tool_calls", scenario_id=scenario.id, session_id=session_id, diagnostics=run.diagnostics)
                     logger.record_scenario(scenario.id, run.diagnostics)
                 return run
             if any(get_value(event, "Type", "type") == "SessionIdle" for event in capture.events):
-                reason = "Session became idle before the configured success mock rule was observed."
+                reason = "Session became idle."
                 run = ScenarioRun(scenario, session_id, capture.events, capture.tool_calls, False, reason, {})
                 run.diagnostics = build_diagnostics(config, logger, capture, scenario, reason)
                 if logger:
@@ -72,14 +72,14 @@ def run_scenario(config: EvalConfig, scenario: Scenario, logger: EvalLogger | No
                 return run
             if time.monotonic() - last_progress_at > config.idle_timeout_seconds:
                 reason = f"No matching SSE or tool-call progress for {config.idle_timeout_seconds} seconds."
-                run = ScenarioRun(scenario, session_id, capture.events, capture.tool_calls, False, reason, {})
+                run = ScenarioRun(scenario, session_id, capture.events, capture.tool_calls, True, reason, {})
                 run.diagnostics = build_diagnostics(config, logger, capture, scenario, reason)
                 if logger:
                     logger.log("scenario_idle_timeout", scenario_id=scenario.id, session_id=session_id, diagnostics=run.diagnostics)
                     logger.record_scenario(scenario.id, run.diagnostics)
                 return run
             time.sleep(0.25)
-        run = ScenarioRun(scenario, session_id, capture.events, capture.tool_calls, False, reason, {})
+        run = ScenarioRun(scenario, session_id, capture.events, capture.tool_calls, True, reason, {})
         run.diagnostics = build_diagnostics(config, logger, capture, scenario, reason)
         if logger:
             logger.log("scenario_timeout", scenario_id=scenario.id, session_id=session_id, diagnostics=run.diagnostics)

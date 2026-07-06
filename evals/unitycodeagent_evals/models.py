@@ -48,7 +48,6 @@ class MockRule:
     contains: tuple[str, ...]
     result_is_error: bool
     result_text: str
-    marks_success: bool
     once: bool
 
 
@@ -57,6 +56,7 @@ class Scenario:
     id: str
     prompt: str
     tool_name: str
+    max_tool_calls: int
     mock_rules: tuple[MockRule, ...]
     policy: dict[str, Any]
     fallback_result_is_error: bool
@@ -115,7 +115,7 @@ class ScenarioRun:
     session_id: str
     events: list[dict[str, Any]]
     tool_calls: list[ToolCall]
-    success_observed: bool
+    failed: bool
     reason: str
     diagnostics: dict[str, Any]
 
@@ -124,7 +124,7 @@ class ScenarioRun:
             {
                 "scenario_id": self.scenario.id,
                 "session_id": self.session_id,
-                "success_observed": self.success_observed,
+                "failed": self.failed,
                 "reason": self.reason,
                 "diagnostics": self.diagnostics,
                 "tool_calls": [
@@ -140,4 +140,3 @@ class ScenarioRun:
             },
             indent=2,
         )
-

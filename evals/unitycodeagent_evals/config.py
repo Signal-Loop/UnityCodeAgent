@@ -80,6 +80,9 @@ def load_scenarios(skill_name: str) -> list[Scenario]:
     data = load_toml(path)
     scenarios: list[Scenario] = []
     for item in data.get("scenario", []):
+        max_tool_calls = int(item.get("max_tool_calls", 10))
+        if max_tool_calls <= 0:
+            raise ValueError(f"Scenario {item['id']} max_tool_calls must be a positive integer.")
         mock_rules = tuple(
             MockRule(
                 tool_name=rule.get("tool_name", item.get("tool_name", "")),
@@ -87,7 +90,6 @@ def load_scenarios(skill_name: str) -> list[Scenario]:
                 contains=tuple(rule.get("contains", [])),
                 result_is_error=bool(rule.get("result_is_error", False)),
                 result_text=rule.get("result_text", ""),
-                marks_success=bool(rule.get("marks_success", False)),
                 once=bool(rule.get("once", False)),
             )
             for rule in item.get("mock_rule", [])
@@ -100,6 +102,7 @@ def load_scenarios(skill_name: str) -> list[Scenario]:
                 id=item["id"],
                 prompt=item["prompt"],
                 tool_name=item.get("tool_name", ""),
+                max_tool_calls=max_tool_calls,
                 mock_rules=mock_rules,
                 policy=policy,
                 fallback_result_is_error=bool(item.get("fallback_result_is_error", True)),
