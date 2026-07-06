@@ -1,6 +1,6 @@
 ---
 name: unitycodeagent
-description: TRIGGER when you need to modify scenes, add, remove or modify game objects, components, scriptable objects or perform any other task in Unity Editor. Also covers when and how to use read_unity_console_logs and run_unity_tests tools as part of the same workflow  and create or modify favourite scripts used to automate tasks. DO NOT TRIGGER for generic C# code execution, file editing, or other non-Unity Editor tasks.
+description: 'Use when an agent must inspect or modify Unity Editor state with UnityCodeAgent: scene, GameObject, component, prefab, asset, ScriptableObject, or Editor automation changes; Unity console log checks; Unity EditMode or PlayMode test runs; or creating/updating favourite Editor scripts. Do not use for generic C# source editing, plain file reads/writes, or non-Unity Editor tasks.'
 ---
 
 # Executing C# Scripts in Unity Editor
@@ -30,6 +30,26 @@ This skill coordinates three tools within one workflow. Use the tool that matche
 
 ---
 
+## Execute C# Script Tool Contract
+
+Use `execute_csharp_script_in_unity_editor` for live Unity Editor work:
+
+- Modify scene objects, GameObjects, Components, Transforms, UI elements, Prefabs, ScriptableObjects, or other assets through Unity APIs.
+- Query current Editor, scene, prefab, or asset state, such as listing objects or reading component values.
+- Batch-process or automate Editor tasks.
+- Compute values with Unity math and physics APIs such as `Mathf`, `Vector3`, `Quaternion`, and `Physics` when the result depends on Unity behavior.
+
+Do not use `execute_csharp_script_in_unity_editor` for these tasks:
+
+- Editing C# source files. Use file editing tools.
+- Reading or writing plain text, JSON, YAML, or other project files. Use file tools.
+- Installing packages or changing ProjectSettings. Use dedicated project tooling or a narrower explicit workflow.
+- Running Unity tests. Use `run_unity_tests`.
+
+The tool runs raw C# top-level statements in the Unity Editor with Roslyn. It executes synchronously on the main thread, has access to the loaded Unity/project assemblies, captures `Debug.Log()`, `Debug.LogError()`, and the final evaluated expression, and marks the active scene dirty after successful execution in edit mode.
+
+---
+
 ## Core Principles
 
 - **Top-Level Statements Only:** Write flat code. Do **not** wrap code in a class, method, or `[MenuItem]`. Provide only the sequence of statements and any required `using` directives.
@@ -39,7 +59,7 @@ This skill coordinates three tools within one workflow. Use the tool that matche
 - **Synchronous Only:** Do **not** use `async`/`await`, `Task`, or `Task.Run`. All Unity Editor APIs are main-thread-only and synchronous.
 - **Null Checks:** Always use `== null` for Unity objects. Do **not** use `??` or `?.` — Unity objects override the `==` operator in ways that break null-conditional operators.
 - **Specificity:** Prefer fully qualified names (e.g., `UnityEngine.GameObject`, `UnityEditor.AssetDatabase`) to avoid ambiguity.
-- **Script Feedback:** Use `UnityEngine.Debug.Log()` to report what the script did. Use `UnityEngine.Debug.LogError()` for failures. The tool captures both.
+- **Script Feedback:** Use `UnityEngine.Debug.Log()` to report what the script did. Use `UnityEngine.Debug.LogError()` for failures. The tool captures both plus the final evaluated expression.
 - **Clarity & Error Handling:** Comment non-obvious logic. Wrap risky operations in `try-catch` and log errors with context.
 - **Object class ambiguity:** Always use `UnityEngine.Object` when referring to Unity objects to avoid confusion with `System.Object`.
 

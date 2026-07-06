@@ -104,7 +104,7 @@ Added UnityEngine.Physics2DModule to UnityCodeAgent additional tool assemblies.
 [[scenario.mock_rule]]
 tool_name = "execute_csharp_script_in_unity_editor"
 argument_name = "script"
-contains = ["Rigidbody2D"]
+contains = ["Rigidbody2D", "UnityEngine.Physics2DModule"]
 result_is_error = true
 once = true
 result_text = """Status: error
@@ -114,6 +114,19 @@ result_text = """Status: error
 (none)
 ### Errors
 error CS0246: The type or namespace name 'Rigidbody2D' could not be found (are you missing a using directive or an assembly reference?)"""
+
+[[scenario.mock_rule]]
+tool_name = "execute_csharp_script_in_unity_editor"
+argument_name = "script"
+contains = ["Rigidbody2D", "UnityEngine.Physics2DModule"]
+result_is_error = false
+result_text = """Status: success
+
+**Unity Editor is in Edit Mode**
+### Logs
+Added UnityEngine.Physics2DModule to gameObject.
+### Errors
+(none)"""
 
 [scenario.policy]
 threshold = 1.0
