@@ -24,12 +24,14 @@ from unitycodeagent_evals import (
     TelemetryConfig,
     ToolCall,
     build_diagnostics,
+    create_shared_eval_run_root,
     filter_scenario_cases,
-    load_eval_config,
+    load_managed_service_startup_config,
     load_scenarios,
     parse_scenario_filter_tokens,
     parse_telemetry_config,
     run_scenario,
+    set_managed_service_context,
 )
 
 SKILL_NAME = "unitycodeagent"
@@ -164,7 +166,7 @@ def test_scenario_filter_reports_unknown_scenario():
 
 
 def test_eval_config_loads_committed_scenarios():
-    config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
     scenarios = load_scenarios(SKILL_NAME)
 
     expected = {
@@ -182,12 +184,41 @@ def test_eval_config_loads_committed_scenarios():
     assert_test(test_case, HARNESS_CONFIG_METRICS)
 
 
+def test_managed_service_startup_config_does_not_require_endpoint_manifest():
+    set_managed_service_context(None, None)
+
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
+
+    assert config.service_url == "http://127.0.0.1:0"
+    assert config.provider.model
+    assert config.telemetry.enabled is True
+
+
+def test_shared_eval_run_root_groups_scenario_and_service_artifacts(tmp_path):
+    shared_root = create_shared_eval_run_root(tmp_path)
+
+    scenario_logger = EvalLogger("unitycodeagent", artifact_root=shared_root)
+    managed_logger = EvalLogger("managed-service", artifact_root=shared_root)
+
+    scenario_logger.log("scenario_start", scenario_id="scenario-1")
+    scenario_logger.record_scenario("scenario-1", {"status": "ok"})
+    managed_logger.log("managed_service_start", service_url="http://127.0.0.1:1234")
+    managed_logger.write_summary()
+
+    assert scenario_logger.artifact_dir.parent == shared_root / "unitycodeagent"
+    assert managed_logger.artifact_dir.parent == shared_root / "managed-service"
+    assert scenario_logger.events_path.exists()
+    assert scenario_logger.summary_path.exists()
+    assert managed_logger.events_path.exists()
+    assert managed_logger.summary_path.exists()
+
+
 def test_root_dotenv_loads_provider_key_without_shell_export():
     if not (ROOT / ".env").exists():
         pytest.skip("Root .env is local-only; create it to run the provider key smoke test.")
     previous = os.environ.pop("OPENROUTER_API_KEY", None)
     try:
-        config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+        config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
         assert config.env_files_loaded
         assert bool(config.provider.api_key) is True
     finally:
@@ -208,7 +239,7 @@ def test_create_session_sends_provider_loaded_from_config_and_dotenv():
         return httpx.Response(202)
 
     try:
-        config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+        config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
         http = httpx.Client(base_url=config.service_url, transport=httpx.MockTransport(handler))
         client = AgentServiceClient(config, UNIT_LOGGER, http=http)
         try:
@@ -255,7 +286,7 @@ def test_client_send_prompt_waits_for_assistant_message_and_session_idle():
             return httpx.Response(202)
         return httpx.Response(404)
 
-    config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
     http = httpx.Client(base_url=config.service_url, transport=httpx.MockTransport(handler))
     client = AgentServiceClient(config, UNIT_LOGGER, timeout_seconds=2, http=http)
     try:
@@ -291,7 +322,7 @@ def test_client_send_prompt_can_return_after_assistant_response_when_idle_times_
             return httpx.Response(202)
         return httpx.Response(404)
 
-    config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
     http = httpx.Client(base_url=config.service_url, transport=httpx.MockTransport(handler))
     client = AgentServiceClient(config, UNIT_LOGGER, timeout_seconds=1, http=http)
     try:
@@ -311,7 +342,7 @@ def test_client_send_prompt_can_return_after_assistant_response_when_idle_times_
 
 def test_run_scenario_returns_when_session_idle_is_observed(monkeypatch):
     scenario = make_scenario_case(SKILL_NAME, "idle-before-success").scenario
-    config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
 
     class FakeClient:
         def __init__(self, config, logger):
@@ -368,7 +399,7 @@ def test_run_scenario_returns_when_session_idle_is_observed(monkeypatch):
 
 
 def test_build_diagnostics_includes_source_event_type_and_content_length():
-    config = load_eval_config(SKILL_NAME, UNIT_LOGGER)
+    config = load_managed_service_startup_config(SKILL_NAME, UNIT_LOGGER)
     scenario = make_scenario_case(SKILL_NAME, "diagnostics").scenario
 
     class DiagnosticsCapture:

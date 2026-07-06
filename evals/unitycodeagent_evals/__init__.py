@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from .artifacts import EvalLogger
+from .artifacts import EvalLogger, create_shared_eval_run_root
 from .client import AgentServiceClient, SessionEventWaitResult
 from .config import (
     load_eval_config,
+    load_managed_service_startup_config,
     load_scenarios,
     parse_telemetry_config,
     resolve_service_url,
@@ -59,6 +60,7 @@ __all__ = [
     "get_value",
     "load_dotenv_files",
     "load_eval_config",
+    "load_managed_service_startup_config",
     "load_scenarios",
     "load_toml",
     "parse_dotenv_line",
@@ -69,4 +71,5 @@ __all__ = [
     "run_scenario",
     "select_scenario_cases",
     "set_managed_service_context",
+    "create_shared_eval_run_root",
 ]

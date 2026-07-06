@@ -16,8 +16,12 @@ SKILL_NAME = "unitycodeagent"
 
 
 @pytest.fixture(autouse=True)
-def log_test_progress(request):
-    logger = EvalLogger("live-preflight", enabled=request.config.getoption("live"))
+def log_test_progress(request, shared_eval_run_root):
+    logger = EvalLogger(
+        "live-preflight",
+        enabled=request.config.getoption("live"),
+        artifact_root=shared_eval_run_root,
+    )
     logger.log("test_start", test_name=request.node.name)
     yield
     logger.log("test_end", test_name=request.node.name)
@@ -62,11 +66,11 @@ def run_live_preflight(config: EvalConfig, logger: EvalLogger | None = None) -> 
         client.close()
 
 
-def test_live_eval_preflight(request):
+def test_live_eval_preflight(request, shared_eval_run_root):
     if not request.config.getoption("live"):
         pytest.skip("Pass --live to let the eval suite start a managed no-Unity service.")
 
-    logger = EvalLogger("live-preflight")
+    logger = EvalLogger("live-preflight", artifact_root=shared_eval_run_root)
     config = load_eval_config(SKILL_NAME, logger)
     result = run_live_preflight(config, logger)
     expected = {

@@ -10,8 +10,15 @@ from .models import EvalConfig, MockRule, ProviderConfig, Scenario, TelemetryCon
 from .paths import DEFAULT_ENDPOINT_MANIFEST, ROOT, SKILLS_ROOT, get_managed_service_url, get_managed_working_directory
 from .utils import get_value, load_toml
 
+MANAGED_SERVICE_STARTUP_URL = "http://127.0.0.1:0"
 
-def load_eval_config(skill_name: str, logger: EvalLogger | None = None) -> EvalConfig:
+
+def load_eval_config(
+    skill_name: str,
+    logger: EvalLogger | None = None,
+    *,
+    service_url: str | None = None,
+) -> EvalConfig:
     env_files = load_dotenv_files(skill_name, logger)
     config_path = SKILLS_ROOT / skill_name / "evals" / "config.toml"
     data = load_toml(config_path)
@@ -22,7 +29,7 @@ def load_eval_config(skill_name: str, logger: EvalLogger | None = None) -> EvalC
 
     config = EvalConfig(
         skill_name=skill_name,
-        service_url=resolve_service_url(),
+        service_url=service_url or resolve_service_url(),
         provider=ProviderConfig(
             model=provider_data["model"],
             type=provider_data.get("type"),
@@ -52,6 +59,11 @@ def load_eval_config(skill_name: str, logger: EvalLogger | None = None) -> EvalC
             telemetry_otlp_endpoint=config.telemetry.otlp_endpoint,
         )
     return config
+
+
+def load_managed_service_startup_config(skill_name: str, logger: EvalLogger | None = None) -> EvalConfig:
+    """Load settings needed to start the managed service before it has published an endpoint."""
+    return load_eval_config(skill_name, logger, service_url=MANAGED_SERVICE_STARTUP_URL)
 
 
 def parse_telemetry_config(data: dict[str, Any] | None) -> TelemetryConfig:
@@ -123,5 +135,3 @@ def resolve_working_directory(session_data: dict[str, Any]) -> Path:
     if get_managed_working_directory():
         return get_managed_working_directory()
     return (ROOT / session_data.get("working_directory", ".")).resolve()
-
-

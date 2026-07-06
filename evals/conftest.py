@@ -3,7 +3,13 @@ from __future__ import annotations
 import pytest
 from deepeval.test_run.test_run import PromptData, global_test_run_manager
 
-from unitycodeagent_evals import EvalLogger, ManagedAgentService, load_eval_config, select_scenario_cases
+from unitycodeagent_evals import (
+    EvalLogger,
+    ManagedAgentService,
+    create_shared_eval_run_root,
+    load_managed_service_startup_config,
+    select_scenario_cases,
+)
 
 
 def pytest_addoption(parser):
@@ -45,8 +51,15 @@ def pytest_sessionfinish(session, exitstatus):
     global_test_run_manager.save_test_run(global_test_run_manager.temp_file_path)
 
 
+@pytest.fixture(scope="session")
+def shared_eval_run_root(request):
+    if not request.config.getoption("live"):
+        return None
+    return create_shared_eval_run_root()
+
+
 @pytest.fixture(scope="session", autouse=True)
-def managed_no_unity_service(request):
+def managed_no_unity_service(request, shared_eval_run_root):
     if not request.config.getoption("live"):
         yield
         return
@@ -56,8 +69,8 @@ def managed_no_unity_service(request):
         yield
         return
 
-    logger = EvalLogger("managed-service")
-    config = load_eval_config(scenario_cases[0].skill_name, logger)
+    logger = EvalLogger("managed-service", artifact_root=shared_eval_run_root)
+    config = load_managed_service_startup_config(scenario_cases[0].skill_name, logger)
     service = ManagedAgentService(config, logger)
     service.start()
     try:

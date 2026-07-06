@@ -12,7 +12,7 @@ uv sync
 uv lock
 ```
 
-Use `uv run --env-file .env ...` for checks that need the repository root `.env`. On Windows, keep `PYTHONUTF8=1` in `.env` so DeepEval/Rich output uses UTF-8 from interpreter startup.
+Use `uv run --env-file .env ...` for checks that need the repository root `.env`. Unit checks can use the startup config path and do not require a published endpoint manifest. Live checks still need the managed service to publish `.unityCodeAgent/service/runtime/endpoint.json`. On Windows, keep `PYTHONUTF8=1` in `.env` so DeepEval/Rich output uses UTF-8 from interpreter startup.
 
 ## Module Layout
 
@@ -21,7 +21,7 @@ Harness code lives under `unitycodeagent_evals/`:
 - `paths.py`: repository paths and managed-service context.
 - `models.py`: shared dataclasses for config, scenarios, tool calls, and scenario runs.
 - `env.py`: `.env` parsing/loading.
-- `config.py`: TOML loading, service URL resolution, and scenario loading.
+- `config.py`: TOML loading, startup/live service URL resolution, and scenario loading.
 - `scenario_selection.py`: skill/scenario discovery and filter handling.
 - `artifacts.py`: `EvalLogger` and JSONL/summary artifact writing.
 - `client.py`: Agent Service HTTP and wait-for-SSE helpers.
@@ -42,7 +42,9 @@ Live evals start a managed no-Unity UnityCodeAgent service and use the real serv
 
 The harness intercepts `ToolInvocationRequest` SSE events and posts mocked tool results back to the service, so Unity project files and settings are not modified.
 
-Live runs write diagnostics under `.artifacts/<skill>/<run_id>/`, including `events.jsonl` and `summary.json`. The managed service writes its endpoint manifest, logs, stdout/stderr, and default telemetry file under `.artifacts/managed-service/<run_id>/`. These files are local artifacts and are ignored by git.
+Live runs write diagnostics under a shared eval root in `.artifacts/<run_id>/`, with scenario logs under `.artifacts/<run_id>/unitycodeagent/<scenario_run_id>/` and managed-service logs under `.artifacts/<run_id>/managed-service/<service_run_id>/`. Each subfolder still contains the same files as before, including `events.jsonl`, `summary.json`, stdout/stderr, the endpoint manifest, and the default telemetry file. These files are local artifacts and are ignored by git.
+
+Unit evals use `load_managed_service_startup_config(...)` to load the same committed TOML and environment inputs without requiring a live endpoint manifest. Live evals use the resolved service URL from `resolve_service_url()` and therefore require the managed service to publish the endpoint manifest first.
 
 Provider keys are loaded from the repository root `.env` first, then from an optional skill-local `<skill>/evals/.env`. Secret values are never printed; diagnostics only report whether the configured key is present.
 
@@ -59,7 +61,7 @@ The file is split into four main sections:
 
 ### `service`
 
-The managed live eval service binds to an ephemeral loopback port and publishes the chosen port in `.unityCodeAgent/service/runtime/endpoint.json`. The harness requires that manifest to exist and will fail if it cannot read it.
+The managed live eval service binds to an ephemeral loopback port and publishes the chosen port in `.unityCodeAgent/service/runtime/endpoint.json`. The live harness requires that manifest to exist and will fail if it cannot read it. Startup-only unit checks bypass this requirement by passing `http://127.0.0.1:0` through `load_managed_service_startup_config(...)`.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
@@ -259,7 +261,7 @@ success_reason = "The agent recovered by adding the missing assembly."
 
 ## Run Checks
 
-Run fast checks before live scenarios:
+Run fast checks before live scenarios. The unit DeepEval run uses the startup config path and is safe without a published endpoint manifest:
 
 ```powershell
 cd evals
