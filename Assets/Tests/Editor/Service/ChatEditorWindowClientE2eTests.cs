@@ -872,6 +872,36 @@ namespace SignalLoop.UnityCodeAgent.Service
         }
 
         [Test]
+        [Description("Goal: verify submit and abort are separate client actions while the active session is busy. Scope: ChatEditorWindowClient command routing only. Boundaries: excludes UI Toolkit rendering and actual runtime cancellation.")]
+        public async Task BusyActiveSession_SubmitFailsAndAbortCallsAbortEndpoint()
+        {
+            var settings = CreateTestSettings();
+            var context = CreateTestContext(settings);
+            var harness = new SessionsViewSubmitHarness();
+            using var client = harness.CreateClient();
+
+            var initResult = await client.InitializeAsync(context, CancellationToken.None);
+            Assert.That(initResult.Success, Is.True);
+
+            var firstSubmit = await client.SubmitPromptAsync(context, "keep session one busy", CancellationToken.None);
+            Assert.That(firstSubmit.Success, Is.True);
+
+            var secondSubmit = await client.SubmitPromptAsync(context, "should not send", CancellationToken.None);
+            Assert.That(secondSubmit.Success, Is.False);
+
+            var abortResult = await client.AbortPromptAsync(context, CancellationToken.None);
+            Assert.That(abortResult.Success, Is.True);
+
+            Assert.That(harness.ApiOperations, Is.EqualTo(new[]
+            {
+                "list",
+                $"open:{Session1Id}:ready",
+                $"send:{Session1Id}:keep session one busy",
+                $"abort:{Session1Id}",
+            }));
+        }
+
+        [Test]
         [Description("Goal: verify submitting from Sessions View with no selected model returns to the transcript and shows the validation error. Scope: ChatEditorWindowClient sessions-view invalid-submit behavior only. Boundaries: excludes UI Toolkit rendering.")]
         public async Task SessionsView_SubmitPromptWithoutSelectedModel_OpensMessagesAndShowsError()
         {

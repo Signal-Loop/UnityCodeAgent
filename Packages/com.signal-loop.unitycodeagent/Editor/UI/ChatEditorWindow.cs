@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -35,6 +35,7 @@ namespace SignalLoop.UnityCodeAgent.UI
         private Button _sessionsButton;
         private Button _settingsButton;
         private Button _sendButton;
+        private Button _stopButton;
         private Label _modelLabel;
         private readonly Dictionary<string, TextField> _streamedMessageFields = new Dictionary<string, TextField>();
         private ChatEditorWindowClient _chatClient;
@@ -83,6 +84,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             _sessionsButton = null;
             _settingsButton = null;
             _sendButton = null;
+            _stopButton = null;
             _modelLabel = null;
             _isBusy = false;
             _transcriptScroller = null;
@@ -108,9 +110,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             _sessionsButton = rootVisualElement.Q<Button>("sessions-button");
             _settingsButton = rootVisualElement.Q<Button>("settings-button");
             _sendButton = rootVisualElement.Q<Button>("send-button");
+            _stopButton = rootVisualElement.Q<Button>("stop-button");
             _modelLabel = rootVisualElement.Q<Label>("model-label");
 
-            if (_scrollView == null || _sessionsScrollView == null || _userInput == null || _sessionsButton == null || _settingsButton == null || _sendButton == null || _modelLabel == null)
+            if (_scrollView == null || _sessionsScrollView == null || _userInput == null || _sessionsButton == null || _settingsButton == null || _sendButton == null || _stopButton == null || _modelLabel == null)
             {
                 Log.Error(nameof(ChatEditorWindow), "Chat window UI is missing required elements.");
                 rootVisualElement.Clear();
@@ -119,10 +122,13 @@ namespace SignalLoop.UnityCodeAgent.UI
             }
 
             _userInput.RegisterCallback<KeyDownEvent>(HandleUserInputKeyDown, TrickleDown.TrickleDown);
+            _userInput.RegisterValueChangedCallback(_ => UpdateComposerState());
             _sessionsButton.clicked += HandleSessionsButtonClicked;
             _settingsButton.clicked += HandleSettingsButtonClicked;
             _sendButton.clicked += HandleSendButtonClicked;
+            _stopButton.clicked += HandleStopButtonClicked;
             _sendButton.text = "Send";
+            _stopButton.text = "Stop";
             _transcriptScroller = new ChatTranscriptScroller(_scrollView);
             _progressMessages = new ChatProgressMessages(_scrollView, _transcriptScroller, Log, ProgressTemplateAssetPath);
             SetBusyState(false);
@@ -152,6 +158,18 @@ namespace SignalLoop.UnityCodeAgent.UI
             }
 
             var result = await ChatClient.SubmitPromptAsync(UnityCodeAgentSettings.GetUnityContext(), _userInput.value ?? string.Empty, GetLifecycleToken());
+            ApplyUpdates(result.Updates);
+            return result.Success;
+        }
+
+        private async Task<bool> AbortPromptAsync()
+        {
+            if (_stopButton == null)
+            {
+                return false;
+            }
+
+            var result = await ChatClient.AbortPromptAsync(UnityCodeAgentSettings.GetUnityContext(), GetLifecycleToken());
             ApplyUpdates(result.Updates);
             return result.Success;
         }
@@ -481,19 +499,26 @@ namespace SignalLoop.UnityCodeAgent.UI
 
         private void UpdateComposerState()
         {
-            if (_sendButton == null)
+            if (_sendButton == null || _stopButton == null)
             {
                 return;
             }
 
             var actionButtonsEnabled = !_isHydratingHistory;
+            var isShowingSessions = _chatClient?.IsShowingSessions ?? false;
+            var isActiveBusyResponse = _isBusy && !isShowingSessions;
+            var canSend = actionButtonsEnabled
+                && !isActiveBusyResponse
+                && !string.IsNullOrWhiteSpace(_userInput?.value);
+            var canStop = actionButtonsEnabled && isActiveBusyResponse;
             _scrollView?.SetEnabled(true);
             _sessionsScrollView?.SetEnabled(true);
             _userInput?.SetEnabled(true);
-            _sessionsButton?.SetEnabled(actionButtonsEnabled && !(_chatClient?.IsShowingSessions ?? false));
+            _sessionsButton?.SetEnabled(actionButtonsEnabled && !isShowingSessions);
             _settingsButton?.SetEnabled(true);
-            _sendButton.SetEnabled(actionButtonsEnabled);
-            _sendButton.text = _isBusy && !(_chatClient?.IsShowingSessions ?? false) ? "Stop" : "Send";
+            _sendButton.SetEnabled(canSend);
+            _sendButton.text = "Send";
+            _stopButton.SetEnabled(canStop);
         }
 
         private VisualElement BuildSessionEntry(SessionSummaryDto session, IReadOnlyCollection<string> unfinishedSessionIds)
@@ -654,6 +679,11 @@ namespace SignalLoop.UnityCodeAgent.UI
         private void HandleSendButtonClicked()
         {
             _ = SubmitPromptAsync();
+        }
+
+        private void HandleStopButtonClicked()
+        {
+            _ = AbortPromptAsync();
         }
 
         private void HandleSessionsButtonClicked()

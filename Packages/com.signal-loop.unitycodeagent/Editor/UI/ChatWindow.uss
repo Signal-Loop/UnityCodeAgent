@@ -61,7 +61,12 @@
   margin-left: 0;
 }
 
-.chat-button--right {
+.chat-button#send-button,
+.chat-button#settings-button {
+  margin-left: 5px;
+}
+
+.chat-button#stop-button {
   margin-left: auto;
 }
 

@@ -138,8 +138,11 @@ namespace SignalLoop.UnityCodeAgent.UI
                     }
 
                     var sendButton = window.rootVisualElement.Q<Button>("send-button");
+                    var stopButton = window.rootVisualElement.Q<Button>("stop-button");
                     return sendButton != null
                         && string.Equals(sendButton.text, "Send", System.StringComparison.Ordinal)
+                        && stopButton != null
+                        && !stopButton.enabledInHierarchy
                         && GetMessageContents(window).Count >= minimumCount;
                 },
                 "Transcript did not return to idle state.");
@@ -187,6 +190,14 @@ namespace SignalLoop.UnityCodeAgent.UI
             var navSubmit = NavigationSubmitEvent.GetPooled();
             navSubmit.target = sendButton;
             sendButton.SendEvent(navSubmit);
+        }
+
+        private static void StopPrompt(ChatEditorWindow window)
+        {
+            var stopButton = window.rootVisualElement.Q<Button>("stop-button");
+            var navSubmit = NavigationSubmitEvent.GetPooled();
+            navSubmit.target = stopButton;
+            stopButton.SendEvent(navSubmit);
         }
 
         private static void OpenSessionsList(ChatEditorWindow window)
@@ -250,6 +261,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             var scrollView = root.Q<ScrollView>("scroll-view");
             var sessionsButton = root.Q<Button>("sessions-button");
             var sendButton = root.Q<Button>("send-button");
+            var stopButton = root.Q<Button>("stop-button");
             var settingsButton = root.Q<Button>("settings-button");
 
             Assert.That(root.enabledInHierarchy, Is.True, "Opening the chat window should not disable the full window.");
@@ -258,6 +270,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(settingsButton.enabledInHierarchy, Is.True, "Settings should remain available during startup.");
             Assert.That(sessionsButton, Is.Not.Null, "The sessions button should remain present during startup.");
             Assert.That(sendButton, Is.Not.Null, "The send button should remain present during startup.");
+            Assert.That(stopButton, Is.Not.Null, "The stop button should remain present during startup.");
             var messages = GetMessageContents(window);
             var startupProgressMessages = new[] { "Opening chat window...", "Loading current chat session...", "Starting agent service..." };
             Assert.That(
@@ -291,6 +304,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(root.Q<ScrollView>("scroll-view"), Is.Not.Null);
             Assert.That(root.Q<TextField>("user-input"), Is.Not.Null);
             Assert.That(root.Q<Button>("send-button"), Is.Not.Null);
+            Assert.That(root.Q<Button>("stop-button"), Is.Not.Null);
             Assert.That(root.Q<Button>("sessions-button"), Is.Not.Null);
             Assert.That(root.Q<Button>("settings-button"), Is.Not.Null);
 
@@ -330,6 +344,47 @@ namespace SignalLoop.UnityCodeAgent.UI
                 "[2] should be the submitted prompt");
             Assert.That(messages[3], Does.Contain("To get the player's position"),
                 "[3] should be the mock assistant response");
+
+            window.Close();
+        }
+
+        [UnityTest]
+        [Description("Open window, mark the active session busy, click Stop, verify abort is dispatched without submitting another prompt.")]
+        public IEnumerator StopButton_AbortsBusyActiveSessionWithoutSubmittingPrompt()
+        {
+            EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
+            yield return WaitForWindowReady();
+
+            var window = FindWindow();
+            Assert.That(window, Is.Not.Null);
+            var initialMessages = GetMessageContents(window);
+            var initialAbortCount = MockServiceRuntime.SharedState.AbortPromptCount;
+
+            EnqueueMockEvent(SimpleMockSessionId(), 700, AgentEventType.SessionStatusChanged, "streaming", "busy-marker");
+            yield return WaitUntil(
+                () =>
+                {
+                    var sendButton = window.rootVisualElement.Q<Button>("send-button");
+                    var stopButton = window.rootVisualElement.Q<Button>("stop-button");
+                    return sendButton != null
+                        && stopButton != null
+                        && sendButton.text == "Send"
+                        && !sendButton.enabledInHierarchy
+                        && stopButton.enabledInHierarchy;
+                },
+                "Chat window did not enable Stop for the busy active session.");
+
+            var userInput = window.rootVisualElement.Q<TextField>("user-input");
+            userInput.value = "this should not be submitted";
+            StopPrompt(window);
+
+            yield return WaitUntil(
+                () => MockServiceRuntime.SharedState.AbortPromptCount == initialAbortCount + 1,
+                "Stop did not dispatch an abort request.");
+
+            var messages = GetMessageContents(window);
+            Assert.That(messages, Is.EqualTo(initialMessages),
+                "Clicking Stop should not append a new prompt to the transcript.");
 
             window.Close();
         }
@@ -477,7 +532,8 @@ namespace SignalLoop.UnityCodeAgent.UI
 
             EnqueueMockEvent(SimpleMockSessionId(), 700, AgentEventType.SessionStatusChanged, "streaming", "busy-marker");
             yield return WaitUntil(
-                () => window.rootVisualElement.Q<Button>("send-button")?.text == "Stop",
+                () => window.rootVisualElement.Q<Button>("stop-button")?.enabledInHierarchy == true
+                    && window.rootVisualElement.Q<Button>("send-button")?.text == "Send",
                 "Chat window did not enter a busy state.");
 
             OpenSessionsList(window);
@@ -487,6 +543,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(sendButton, Is.Not.Null);
             Assert.That(sendButton.text, Is.EqualTo("Send"),
                 "The composer should remain a send action while the sessions list is open.");
+            var stopButton = window.rootVisualElement.Q<Button>("stop-button");
+            Assert.That(stopButton, Is.Not.Null);
+            Assert.That(stopButton.enabledInHierarchy, Is.False,
+                "Stop should be disabled while the sessions list is open.");
 
             var entry = GetSessionEntry(window, SimpleMockSessionId());
             Assert.That(entry.ClassListContains("session-entry--unfinished"), Is.True);
@@ -494,7 +554,8 @@ namespace SignalLoop.UnityCodeAgent.UI
             ClickSessionEntry(window, SimpleMockSessionId());
             yield return WaitUntil(
                 () => window.rootVisualElement.Q<ScrollView>("scroll-view")?.style.display.value == DisplayStyle.Flex
-                    && window.rootVisualElement.Q<Button>("send-button")?.text == "Send",
+                    && window.rootVisualElement.Q<Button>("send-button")?.text == "Send"
+                    && window.rootVisualElement.Q<Button>("stop-button")?.enabledInHierarchy == false,
                 "Ready session did not reopen as an idle transcript.");
 
             OpenSessionsList(window);

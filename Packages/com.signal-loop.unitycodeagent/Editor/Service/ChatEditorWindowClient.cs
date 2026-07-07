@@ -118,15 +118,8 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             if (_isBusy && !_isShowingSessions)
             {
-                if (string.IsNullOrWhiteSpace(_activeSessionId))
-                {
-                    _log.Warning(nameof(ChatEditorWindowClient), "Stop requested without an active session.");
-                    return Failure();
-                }
-
-                _log.Debug(nameof(ChatEditorWindowClient), $"Stopping active response sessionId={_activeSessionId}");
-                await _service.AbortPromptAsync(context, new AbortAgentPromptRequestDto(_activeSessionId), cancellationToken).ConfigureAwait(false);
-                return Success();
+                _log.Debug(nameof(ChatEditorWindowClient), "Ignoring prompt submission while the active session is busy.");
+                return Failure();
             }
 
             var trimmedPrompt = (prompt ?? string.Empty).Trim();
@@ -205,6 +198,39 @@ namespace SignalLoop.UnityCodeAgent.Service
                 EnqueueUpdate(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
                 EnqueueUpdate(new ChatSetBusyStateUpdate(false));
                 return Failure(updates);
+            }
+        }
+
+        public async Task<ChatClientCallResult> AbortPromptAsync(UnityContext context, CancellationToken cancellationToken)
+        {
+            if (_isHydratingHistory)
+            {
+                _log.Debug(nameof(ChatEditorWindowClient), "Ignoring abort while the window is hydrating.");
+                return Failure();
+            }
+
+            if (!_isBusy || _isShowingSessions)
+            {
+                _log.Debug(nameof(ChatEditorWindowClient), "Ignoring abort because no active response is busy.");
+                return Failure();
+            }
+
+            if (string.IsNullOrWhiteSpace(_activeSessionId))
+            {
+                _log.Warning(nameof(ChatEditorWindowClient), "Abort requested without an active session.");
+                return Failure();
+            }
+
+            try
+            {
+                _log.Debug(nameof(ChatEditorWindowClient), $"Aborting active response sessionId={_activeSessionId}");
+                await _service.AbortPromptAsync(context, new AbortAgentPromptRequestDto(_activeSessionId), cancellationToken).ConfigureAwait(false);
+                return Success();
+            }
+            catch (Exception exception)
+            {
+                _log.Error(nameof(ChatEditorWindowClient), $"Abort failed sessionId={_activeSessionId}", exception);
+                return Failure(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
             }
         }
 
