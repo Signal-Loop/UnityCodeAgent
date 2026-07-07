@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -19,13 +19,11 @@ namespace SignalLoop.UnityCodeAgent.Service
         private readonly ConcurrentQueue<AgentServiceEventEnvelope> _pendingServiceEvents = new ConcurrentQueue<AgentServiceEventEnvelope>();
         private readonly ConcurrentQueue<ChatClientUpdate> _pendingClientUpdates = new ConcurrentQueue<ChatClientUpdate>();
         private readonly HashSet<string> _changedSessionIds = new HashSet<string>();
+        private readonly ActiveSessionState _activeSession = new ActiveSessionState();
         private CancellationTokenSource _eventStreamCancellation;
         private string _streamGenerationId = string.Empty;
-        private string _activeSessionId = string.Empty;
         private string _pendingPromptEcho = string.Empty;
         private long? _lastReceivedGlobalEventId;
-        private string _activeSessionRequestSignature = string.Empty;
-        private bool _isBusy;
         private bool _isHydratingHistory;
         private bool _isEventStreamStarted;
         private bool _isShowingSessions;
@@ -52,7 +50,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             if (!ValidateProvider(context, out var validationFailure))
             {
-                _activeSessionRequestSignature = string.Empty;
+                _activeSession.ClearRequestSignature();
                 return validationFailure(
                     new ChatSetModelLabelUpdate(ProviderConfigDto.Empty.DisplayName),
                     new ChatSetBusyStateUpdate(false),
@@ -66,23 +64,24 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _log.Debug(nameof(ChatEditorWindowClient), "Loading current session.");
                 ShowProgressMessage("Opening chat window...");
                 var modelSelection = _service.GetSelectedModel(context);
-                _activeSessionRequestSignature = CreateSessionRequestSignature(context);
+                var sessionRequestSignature = CreateSessionRequestSignature(context);
                 var manifest = await _service.GetEndpointManifestAsync(context).ConfigureAwait(false);
                 SelectStreamCursor(context, manifest);
                 var session = await _service.GetCurrentSessionAsync(context, cancellationToken).ConfigureAwait(false);
-                _activeSessionId = session.SessionId ?? string.Empty;
-                _log.Info(nameof(ChatEditorWindowClient), $"Loaded current session history sessionId={_activeSessionId} messages={session.Messages.Count}");
+                SetActiveSession(session.SessionId, sessionRequestSignature, session.Status);
+                _changedSessionIds.Remove(_activeSession.SessionId);
+                _log.Info(nameof(ChatEditorWindowClient), $"Loaded current session history sessionId={_activeSession.SessionId} messages={session.Messages.Count}");
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
-                    new ChatSetBusyStateUpdate(false),
+                    new ChatSetBusyStateUpdate(_activeSession.IsBusy),
                     new ChatShowMessagesUpdate(session.Messages));
             }
             catch (InvalidOperationException exception) when (exception.Message.IndexOf("did not contain any sessions", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                _activeSessionId = string.Empty;
+                ClearActiveSession();
                 _log.Info(nameof(ChatEditorWindowClient), "No current chat session was available; showing empty transcript.");
                 var modelSelection = GetSelectedModelOrDefault(context);
-                _activeSessionRequestSignature = TryCreateSessionRequestSignature(context);
+                _activeSession.SetRequestSignature(TryCreateSessionRequestSignature(context));
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
                     new ChatSetBusyStateUpdate(false),
@@ -90,10 +89,10 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
             catch (Exception exception)
             {
-                _activeSessionId = string.Empty;
+                ClearActiveSession();
                 _log.Error(nameof(ChatEditorWindowClient), "Failed to load current chat session history.", exception);
                 var modelSelection = GetSelectedModelOrDefault(context);
-                _activeSessionRequestSignature = TryCreateSessionRequestSignature(context);
+                _activeSession.SetRequestSignature(TryCreateSessionRequestSignature(context));
                 return Failure(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
                     new ChatSetBusyStateUpdate(false),
@@ -116,7 +115,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 return Failure();
             }
 
-            if (_isBusy && !_isShowingSessions)
+            if (_activeSession.IsBusy && !_isShowingSessions)
             {
                 _log.Debug(nameof(ChatEditorWindowClient), "Ignoring prompt submission while the active session is busy.");
                 return Failure();
@@ -135,8 +134,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 if (_isShowingSessions)
                 {
                     ClearPendingServiceEvents();
-                    _activeSessionId = string.Empty;
-                    _activeSessionRequestSignature = string.Empty;
+                    ClearActiveSession();
                     _isShowingSessions = false;
                     invalidUpdates.Add(new ChatShowMessagesUpdate(null));
                 }
@@ -153,8 +151,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 if (_isShowingSessions)
                 {
                     ClearPendingServiceEvents();
-                    _activeSessionId = string.Empty;
-                    _activeSessionRequestSignature = CreateSessionRequestSignature(context);
+                    SetActiveSession(string.Empty, CreateSessionRequestSignature(context), "ready");
                     _isShowingSessions = false;
                     EnqueueUpdate(new ChatShowMessagesUpdate(null));
                 }
@@ -164,10 +161,10 @@ namespace SignalLoop.UnityCodeAgent.Service
                 }
 
                 _pendingPromptEcho = trimmedPrompt;
-                _isBusy = true;
+                SetActiveSessionStatus("streaming");
                 EnqueueUpdate(new ChatShowAgentEventUpdate(new AgentServiceEventEnvelope(
                     0,
-                    _activeSessionId,
+                    _activeSession.SessionId,
                     DateTimeOffset.UtcNow,
                     trimmedPrompt,
                     null,
@@ -177,23 +174,25 @@ namespace SignalLoop.UnityCodeAgent.Service
                 EnqueueUpdate(new ChatSetUserInput(string.Empty));
                 EnqueueUpdate(new ChatSetBusyStateUpdate(true));
 
-                if (string.IsNullOrWhiteSpace(_activeSessionId))
+                if (string.IsNullOrWhiteSpace(_activeSession.SessionId))
                 {
                     _log.Info(nameof(ChatEditorWindowClient), "Creating a new chat session for submitted prompt.");
                     var createdSession = await _service.CreateSessionAsync(context, cancellationToken).ConfigureAwait(false);
-                    _activeSessionId = createdSession.SessionId;
-                    _log.Info(nameof(ChatEditorWindowClient), $"Created chat session sessionId={_activeSessionId}");
+                    SetActiveSession(createdSession.SessionId, _activeSession.RequestSignature, "streaming");
+                    _log.Info(nameof(ChatEditorWindowClient), $"Created chat session sessionId={_activeSession.SessionId}");
                 }
 
-                EnsureEventStreamStarted(context);
-                _log.Info(nameof(ChatEditorWindowClient), $"Submitting prompt sessionId={_activeSessionId} promptLength={trimmedPrompt.Length}");
+                _changedSessionIds.Add(_activeSession.SessionId);
 
-                await _service.SendPromptAsync(context, new SendAgentPromptRequestDto(_activeSessionId, trimmedPrompt), cancellationToken).ConfigureAwait(false);
+                EnsureEventStreamStarted(context);
+                _log.Info(nameof(ChatEditorWindowClient), $"Submitting prompt sessionId={_activeSession.SessionId} promptLength={trimmedPrompt.Length}");
+
+                await _service.SendPromptAsync(context, new SendAgentPromptRequestDto(_activeSession.SessionId, trimmedPrompt), cancellationToken).ConfigureAwait(false);
                 return Success(updates);
             }
             catch (Exception exception)
             {
-                _isBusy = false;
+                SetActiveSessionStatus("ready");
                 _log.Error(nameof(ChatEditorWindowClient), "Prompt submission failed.", exception);
                 EnqueueUpdate(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
                 EnqueueUpdate(new ChatSetBusyStateUpdate(false));
@@ -209,13 +208,13 @@ namespace SignalLoop.UnityCodeAgent.Service
                 return Failure();
             }
 
-            if (!_isBusy || _isShowingSessions)
+            if (!_activeSession.IsBusy || _isShowingSessions)
             {
                 _log.Debug(nameof(ChatEditorWindowClient), "Ignoring abort because no active response is busy.");
                 return Failure();
             }
 
-            if (string.IsNullOrWhiteSpace(_activeSessionId))
+            if (string.IsNullOrWhiteSpace(_activeSession.SessionId))
             {
                 _log.Warning(nameof(ChatEditorWindowClient), "Abort requested without an active session.");
                 return Failure();
@@ -223,13 +222,14 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             try
             {
-                _log.Debug(nameof(ChatEditorWindowClient), $"Aborting active response sessionId={_activeSessionId}");
-                await _service.AbortPromptAsync(context, new AbortAgentPromptRequestDto(_activeSessionId), cancellationToken).ConfigureAwait(false);
+                _log.Debug(nameof(ChatEditorWindowClient), $"Aborting active response sessionId={_activeSession.SessionId}");
+                _changedSessionIds.Remove(_activeSession.SessionId);
+                await _service.AbortPromptAsync(context, new AbortAgentPromptRequestDto(_activeSession.SessionId), cancellationToken).ConfigureAwait(false);
                 return Success();
             }
             catch (Exception exception)
             {
-                _log.Error(nameof(ChatEditorWindowClient), $"Abort failed sessionId={_activeSessionId}", exception);
+                _log.Error(nameof(ChatEditorWindowClient), $"Abort failed sessionId={_activeSession.SessionId}", exception);
                 return Failure(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
             }
         }
@@ -239,13 +239,6 @@ namespace SignalLoop.UnityCodeAgent.Service
             try
             {
                 var sessions = await _service.GetSessionsAsync(context, cancellationToken).ConfigureAwait(false);
-
-                //TODO: _changedSessionId should only be updated when the session is actually changed by event.
-                if (_isBusy && !string.IsNullOrWhiteSpace(_activeSessionId))
-                {
-                    _changedSessionIds.Add(_activeSessionId);
-                }
-
                 _isShowingSessions = true;
                 return Success(new ChatShowSessionsUpdate(sessions, _changedSessionIds));
             }
@@ -274,15 +267,14 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 var session = await _service.OpenSessionAsync(context, sessionId, cancellationToken).ConfigureAwait(false);
                 var modelSelection = _service.GetSelectedModel(context);
-                _activeSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? sessionId : session.SessionId;
-                _activeSessionRequestSignature = CreateSessionRequestSignature(context);
+                var resolvedSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? sessionId : session.SessionId;
+                SetActiveSession(resolvedSessionId, CreateSessionRequestSignature(context), session.Status);
                 _isShowingSessions = false;
-                _isBusy = AgentSessionStatus.IsBusy(session.Status);
-                _changedSessionIds.Remove(_activeSessionId);
+                _changedSessionIds.Remove(_activeSession.SessionId);
                 EnsureEventStreamStarted(context);
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
-                    new ChatSetBusyStateUpdate(_isBusy),
+                    new ChatSetBusyStateUpdate(_activeSession.IsBusy),
                     new ChatShowMessagesUpdate(session.Messages));
             }
             catch (Exception exception)
@@ -322,12 +314,10 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
             }
 
-            _activeSessionId = string.Empty;
+            ClearActiveSession();
             _pendingPromptEcho = string.Empty;
             _streamGenerationId = string.Empty;
             _lastReceivedGlobalEventId = null;
-            _activeSessionRequestSignature = string.Empty;
-            _isBusy = false;
             _isHydratingHistory = false;
             _isEventStreamStarted = false;
             _isShowingSessions = false;
@@ -374,7 +364,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
             catch (Exception exception)
             {
-                _isBusy = false;
+                SetActiveSessionStatus("ready");
                 _isEventStreamStarted = false;
                 _log.Error(nameof(ChatEditorWindowClient), "Agent stream observation failed.", exception);
                 EnqueueUpdate(new ChatShowErrorUpdate("Agent stream observation failed.", exception.ToString()));
@@ -467,9 +457,9 @@ namespace SignalLoop.UnityCodeAgent.Service
                 if (string.IsNullOrWhiteSpace(envelope.SessionId)
                     && envelope.SequenceNumber == 0
                     && envelope.Type == AgentEventType.SessionStatusChanged
-                    && !string.IsNullOrWhiteSpace(_activeSessionId))
+                    && !string.IsNullOrWhiteSpace(_activeSession.SessionId))
                 {
-                    envelope = envelope with { SessionId = _activeSessionId };
+                    envelope = envelope with { SessionId = _activeSession.SessionId };
                 }
 
                 if (string.IsNullOrWhiteSpace(envelope.SessionId))
@@ -500,45 +490,36 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
 
             bool hasBusyStateUpdate = false;
-            bool nextBusyState = _isBusy;
+            bool nextBusyState = _activeSession.IsBusy;
 
-            //TODO: Rewrite to switch clause
-            if (envelope.Type == AgentEventType.Error)
+            switch (envelope.Type)
             {
-                _isBusy = false;
-                hasBusyStateUpdate = true;
-                nextBusyState = false;
-            }
-
-            if (envelope.Type == AgentEventType.UserMessage)
-            {
-                if (string.Equals(envelope.Content.Trim(), _pendingPromptEcho, StringComparison.Ordinal))
-                {
-                    _pendingPromptEcho = string.Empty;
+                case AgentEventType.Error:
+                    nextBusyState = SetActiveSessionStatus("ready");
+                    hasBusyStateUpdate = true;
+                    _changedSessionIds.Remove(envelope.SessionId);
+                    break;
+                case AgentEventType.UserMessage:
+                    if (string.Equals(envelope.Content.Trim(), _pendingPromptEcho, StringComparison.Ordinal))
+                    {
+                        _pendingPromptEcho = string.Empty;
+                        return;
+                    }
+                    break;
+                case AgentEventType.SessionIdle:
+                    _log.Info(nameof(ChatEditorWindowClient), $"Session became idle sessionId={envelope.SessionId}");
+                    nextBusyState = SetActiveSessionStatus("ready");
+                    hasBusyStateUpdate = true;
+                    _changedSessionIds.Remove(envelope.SessionId);
+                    break;
+                case AgentEventType.SessionStatusChanged:
+                    nextBusyState = SetActiveSessionStatus(envelope.Content);
+                    hasBusyStateUpdate = true;
+                    _log.Debug(nameof(ChatEditorWindowClient), $"Session status changed sessionId={envelope.SessionId} status={envelope.Content}");
+                    break;
+                case AgentEventType.ToolInvocationRequest:
+                    _ = ExecuteToolInvocationRequestAsync(context, envelope);
                     return;
-                }
-            }
-
-            if (envelope.Type == AgentEventType.SessionIdle)
-            {
-                _log.Info(nameof(ChatEditorWindowClient), $"Session became idle sessionId={envelope.SessionId}");
-                _isBusy = false;
-                hasBusyStateUpdate = true;
-                nextBusyState = false;
-            }
-
-            if (envelope.Type == AgentEventType.SessionStatusChanged)
-            {
-                _isBusy = AgentSessionStatus.IsBusy(envelope.Content);
-                hasBusyStateUpdate = true;
-                nextBusyState = _isBusy;
-                _log.Debug(nameof(ChatEditorWindowClient), $"Session status changed sessionId={envelope.SessionId} status={envelope.Content}");
-            }
-
-            if (envelope.Type == AgentEventType.ToolInvocationRequest)
-            {
-                _ = ExecuteToolInvocationRequestAsync(context, envelope);
-                return;
             }
 
             if (hasBusyStateUpdate)
@@ -609,25 +590,12 @@ namespace SignalLoop.UnityCodeAgent.Service
             _cursorStore.Save(context.Paths, _streamGenerationId, _lastReceivedGlobalEventId);
         }
 
-        private bool ShouldIgnoreEvent(AgentServiceEventEnvelope envelope)
-        {
-            if (envelope == null)
-            {
-                return true;
-            }
-
-            return _isShowingSessions
-                || !string.IsNullOrWhiteSpace(_activeSessionId)
-                && !string.IsNullOrWhiteSpace(envelope.SessionId)
-                && !string.Equals(envelope.SessionId, _activeSessionId, StringComparison.Ordinal);
-        }
-
         private bool IsActiveSession(string sessionId)
         {
             return
-                !string.IsNullOrWhiteSpace(_activeSessionId)
+                !string.IsNullOrWhiteSpace(_activeSession.SessionId)
                 && !string.IsNullOrWhiteSpace(sessionId)
-                && string.Equals(sessionId, _activeSessionId, StringComparison.Ordinal);
+                && string.Equals(sessionId, _activeSession.SessionId, StringComparison.Ordinal);
         }
 
         private void StartSessionRequestRefreshIfNeeded(UnityContext context)
@@ -637,7 +605,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 if (now >= _nextSessionRequestRefreshUtc)
                 {
-                    _activeSessionRequestSignature = string.Empty;
+                    _activeSession.ClearRequestSignature();
                     _nextSessionRequestRefreshUtc = now.AddMilliseconds(500);
                     EnqueueSelectedModelLabelUpdate(context);
                 }
@@ -657,7 +625,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 return;
             }
 
-            if (_isRefreshingSessionRequest || _isBusy || _isHydratingHistory || now < _nextSessionRequestRefreshUtc)
+            if (_isRefreshingSessionRequest || _activeSession.IsBusy || _isHydratingHistory || now < _nextSessionRequestRefreshUtc)
             {
                 return;
             }
@@ -688,44 +656,44 @@ namespace SignalLoop.UnityCodeAgent.Service
             EnqueueSelectedModelLabelUpdate(context);
             if (!ValidateProvider(context, out _))
             {
-                _activeSessionRequestSignature = string.Empty;
+                _activeSession.ClearRequestSignature();
                 return false;
             }
 
             var sessionRequestSignature = CreateSessionRequestSignature(context);
 
-            if (string.Equals(sessionRequestSignature, _activeSessionRequestSignature, StringComparison.Ordinal))
+            if (string.Equals(sessionRequestSignature, _activeSession.RequestSignature, StringComparison.Ordinal))
             {
                 return true;
             }
 
-            if (string.IsNullOrWhiteSpace(_activeSessionId))
+            if (string.IsNullOrWhiteSpace(_activeSession.SessionId))
             {
-                _activeSessionRequestSignature = sessionRequestSignature;
+                _activeSession.SetRequestSignature(sessionRequestSignature);
                 return true;
             }
 
             try
             {
                 EnqueueUpdate(new ChatSetBusyStateUpdate(true));
-                var session = await _service.OpenSessionAsync(context, _activeSessionId, cancellationToken).ConfigureAwait(false);
-                _activeSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? _activeSessionId : session.SessionId;
-                _activeSessionRequestSignature = sessionRequestSignature;
+                var session = await _service.OpenSessionAsync(context, _activeSession.SessionId, cancellationToken).ConfigureAwait(false);
+                var resolvedSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? _activeSession.SessionId : session.SessionId;
+                SetActiveSession(resolvedSessionId, sessionRequestSignature, session.Status);
                 EnsureEventStreamStarted(context);
 
-                _log.Info(nameof(ChatEditorWindowClient), $"Reconfigured active session after session-bound settings changed sessionId={_activeSessionId}");
+                _log.Info(nameof(ChatEditorWindowClient), $"Reconfigured active session after session-bound settings changed sessionId={_activeSession.SessionId}");
                 return true;
             }
             catch (Exception exception)
             {
                 EnsureEventStreamStarted(context);
-                _log.Error(nameof(ChatEditorWindowClient), $"Failed to reopen active session after session-bound settings changed sessionId={_activeSessionId}", exception);
+                _log.Error(nameof(ChatEditorWindowClient), $"Failed to reopen active session after session-bound settings changed sessionId={_activeSession.SessionId}", exception);
                 EnqueueUpdate(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
                 return false;
             }
             finally
             {
-                EnqueueUpdate(new ChatSetBusyStateUpdate(false));
+                EnqueueUpdate(new ChatSetBusyStateUpdate(_activeSession.IsBusy));
             }
         }
 
@@ -820,6 +788,22 @@ namespace SignalLoop.UnityCodeAgent.Service
 
         private void ShowProgressMessage(string message)
             => EnqueueUpdate(new ChatShowProgressMessageUpdate(message));
+
+        private void SetActiveSession(string sessionId, string requestSignature, string status)
+        {
+            _activeSession.Set(sessionId, requestSignature, status);
+        }
+
+        private bool SetActiveSessionStatus(string status)
+        {
+            _activeSession.SetStatus(status);
+            return _activeSession.IsBusy;
+        }
+
+        private void ClearActiveSession()
+        {
+            _activeSession.Clear();
+        }
 
         private static ChatClientCallResult Success(params ChatClientUpdate[] updates)
         {

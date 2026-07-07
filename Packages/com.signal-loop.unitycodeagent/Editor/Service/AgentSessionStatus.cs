@@ -12,7 +12,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 || status.Equals("aborting", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string Normalize(string status)
+        internal static string Normalize(string status)
         {
             const string prefix = "Status:";
             status = (status ?? string.Empty).Trim();

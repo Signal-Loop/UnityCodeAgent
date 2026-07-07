@@ -225,6 +225,35 @@ namespace SignalLoop.UnityCodeAgent.Service
             // Verify idle / busy updates
             var busyUpdates = result.Updates.OfType<ChatSetBusyStateUpdate>();
             Assert.That(busyUpdates.Any(), Is.True);
+            Assert.That(busyUpdates.Last().IsBusy, Is.False);
+        }
+
+        [Test]
+        [Description("Goal: verify initialization restores active busy state from the current session snapshot, matching Unity domain reload behavior. Scope: ChatEditorWindowClient initialization only. Boundaries: excludes UI Toolkit rendering and real SSE transport.")]
+        public async Task Initialize_BusySessionSnapshot_ReturnsBusyState()
+        {
+            var settings = CreateTestSettings();
+            var context = CreateTestContext(settings);
+            using var client = CreateStaticOpenClient(Session1Id, "streaming");
+
+            var result = await client.InitializeAsync(context, CancellationToken.None);
+
+            Assert.That(result.Success, Is.True);
+            Assert.That(result.Updates.OfType<ChatSetBusyStateUpdate>().Last().IsBusy, Is.True);
+        }
+
+        [Test]
+        [Description("Goal: verify initialization restores idle state from a ready current session snapshot. Scope: ChatEditorWindowClient initialization only. Boundaries: excludes UI Toolkit rendering and real SSE transport.")]
+        public async Task Initialize_ReadySessionSnapshot_ReturnsIdleState()
+        {
+            var settings = CreateTestSettings();
+            var context = CreateTestContext(settings);
+            using var client = CreateStaticOpenClient(Session1Id, "Status: ready");
+
+            var result = await client.InitializeAsync(context, CancellationToken.None);
+
+            Assert.That(result.Success, Is.True);
+            Assert.That(result.Updates.OfType<ChatSetBusyStateUpdate>().Last().IsBusy, Is.False);
         }
 
         // ──────────────────────────────────────────────
@@ -838,24 +867,21 @@ namespace SignalLoop.UnityCodeAgent.Service
         }
 
         [Test]
-        [Description("Goal: verify opening the sessions list while busy marks the active session unfinished and submitting from that view creates a new session instead of aborting the previous one. Scope: ChatEditorWindowClient sessions-view behavior only. Boundaries: excludes UI Toolkit class styling.")]
+        [Description("Goal: verify opening the sessions list while busy does not create a changed-session marker and submitting from that view creates a new session instead of aborting the previous one. Scope: ChatEditorWindowClient sessions-view behavior only. Boundaries: excludes UI Toolkit class styling.")]
         public async Task SessionsView_SubmitPromptWhilePreviousSessionBusy_CreatesNewSession()
         {
             var settings = CreateTestSettings();
             var context = CreateTestContext(settings);
-            var harness = new SessionsViewSubmitHarness();
+            var harness = new BusySessionsViewSubmitHarness();
             using var client = harness.CreateClient();
 
             var initResult = await client.InitializeAsync(context, CancellationToken.None);
             Assert.That(initResult.Success, Is.True);
 
-            var firstSubmit = await client.SubmitPromptAsync(context, "keep session one busy", CancellationToken.None);
-            Assert.That(firstSubmit.Success, Is.True);
-
             var sessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
             Assert.That(sessionsResult.Success, Is.True);
             var showSessions = sessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
-            Assert.That(showSessions.UnfinishedSessionIds, Does.Contain(Session1Id));
+            Assert.That(showSessions.UnfinishedSessionIds, Does.Not.Contain(Session1Id));
 
             var secondSubmit = await client.SubmitPromptAsync(context, "start session two", CancellationToken.None);
             Assert.That(secondSubmit.Success, Is.True);
@@ -863,12 +889,56 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(harness.ApiOperations, Is.EqualTo(new[]
             {
                 "list",
-                $"open:{Session1Id}:ready",
-                $"send:{Session1Id}:keep session one busy",
+                $"open:{Session1Id}:streaming",
                 "list",
                 $"create:{CreatedSession2Id}",
                 $"send:{CreatedSession2Id}:start session two",
             }));
+        }
+
+        [Test]
+        [Description("Goal: verify an event for the active session marks it changed while Sessions View is visible and the marker appears on the next sessions refresh. Scope: ChatEditorWindowClient sessions-view marker lifecycle only. Boundaries: excludes live marker refresh, UI Toolkit class styling.")]
+        public async Task SessionsView_EventForActiveSession_MarksSessionChanged()
+        {
+            var settings = CreateTestSettings();
+            var context = CreateTestContext(settings);
+            var harness = new BackgroundToolInvocationHarness();
+            using var client = harness.CreateClient();
+
+            var initResult = await client.InitializeAsync(context, CancellationToken.None);
+            Assert.That(initResult.Success, Is.True);
+
+            var sessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
+            Assert.That(sessionsResult.Success, Is.True);
+            Assert.That(sessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single().UnfinishedSessionIds, Does.Not.Contain(Session1Id));
+
+            harness.Stream.Publish(new AgentServiceEventEnvelope(
+                44,
+                Session1Id,
+                DateTimeOffset.UtcNow,
+                "streaming",
+                null,
+                AgentEventType.SessionStatusChanged,
+                "streaming",
+                false));
+
+            var sawLiveSessionsUpdate = false;
+            for (var attempt = 0; attempt < EventDeliveryMaxAttempts; attempt++)
+            {
+                await Task.Delay(EventDeliveryPollDelayMs);
+                var drainedUpdates = client.DrainUpdates(context);
+                sawLiveSessionsUpdate |= drainedUpdates.OfType<ChatShowSessionsUpdate>().Any();
+                var refreshResult = await client.ShowSessionsAsync(context, CancellationToken.None);
+                var refreshedSessions = refreshResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
+                if (refreshedSessions.UnfinishedSessionIds.Contains(Session1Id))
+                {
+                    break;
+                }
+            }
+
+            Assert.That(sawLiveSessionsUpdate, Is.False, "Background events should not live-refresh the sessions list.");
+            var finalSessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
+            Assert.That(finalSessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single().UnfinishedSessionIds, Does.Contain(Session1Id));
         }
 
         [Test]
@@ -936,17 +1006,40 @@ namespace SignalLoop.UnityCodeAgent.Service
         {
             var settings = CreateTestSettings();
             var context = CreateTestContext(settings);
-            var harness = new SessionsViewSubmitHarness();
+            var harness = new BackgroundToolInvocationHarness();
             using var client = harness.CreateClient();
 
             var initResult = await client.InitializeAsync(context, CancellationToken.None);
             Assert.That(initResult.Success, Is.True);
 
-            var submitResult = await client.SubmitPromptAsync(context, "mark session one busy", CancellationToken.None);
-            Assert.That(submitResult.Success, Is.True);
+            var sessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
+            Assert.That(sessionsResult.Success, Is.True);
 
-            var firstSessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
-            var firstShowSessions = firstSessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
+            harness.Stream.Publish(new AgentServiceEventEnvelope(
+                45,
+                Session1Id,
+                DateTimeOffset.UtcNow,
+                "streaming",
+                null,
+                AgentEventType.SessionStatusChanged,
+                "streaming",
+                false));
+
+            ChatShowSessionsUpdate firstShowSessions = null;
+            for (var attempt = 0; attempt < EventDeliveryMaxAttempts; attempt++)
+            {
+                await Task.Delay(EventDeliveryPollDelayMs);
+                client.DrainUpdates(context);
+
+                var firstSessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
+                firstShowSessions = firstSessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
+                if (firstShowSessions.UnfinishedSessionIds.Contains(Session1Id))
+                {
+                    break;
+                }
+            }
+
+            Assert.That(firstShowSessions, Is.Not.Null);
             Assert.That(firstShowSessions.UnfinishedSessionIds, Does.Contain(Session1Id));
 
             var openResult = await client.OpenSessionAsync(context, Session1Id, CancellationToken.None);
@@ -996,6 +1089,29 @@ namespace SignalLoop.UnityCodeAgent.Service
                 AgentEventType.ToolInvocationRequest,
                 $"{{\"CallId\":\"{callId}\",\"SessionId\":\"{sessionId}\",\"ToolName\":\"unknown_test_tool\",\"ArgumentsJson\":\"{{}}\"}}",
                 false);
+
+        private static ChatEditorWindowClient CreateStaticOpenClient(string sessionId, string status)
+        {
+            var manifest = new EndpointManifest
+            {
+                Version = 1,
+                Port = 5107,
+                ProjectRoot = "C:/UnityProject",
+                ProjectId = "static-open-project",
+                ServiceProcessId = 5107,
+                UnityProcessId = 1,
+                StartedAtUtc = DateTimeOffset.UtcNow,
+            };
+
+            var service = new AgentService(
+                new MockServiceBootstrap(),
+                new MockServiceBootstrap(),
+                (_, _) => new StaticOpenApiClient(sessionId, status, Array.Empty<AgentServiceEventEnvelope>()),
+                (_, _) => new QuietEventStreamClient(),
+                _ => manifest);
+
+            return new ChatEditorWindowClient(service);
+        }
 
         private sealed class NonActiveEventHarness
         {
@@ -1049,6 +1165,34 @@ namespace SignalLoop.UnityCodeAgent.Service
                     new MockServiceBootstrap(),
                     new MockServiceBootstrap(),
                     (_, _) => new SessionsViewSubmitApiClient(ApiOperations),
+                    (_, _) => new QuietEventStreamClient(),
+                    _ => _manifest);
+
+                return new ChatEditorWindowClient(service);
+            }
+        }
+
+        private sealed class BusySessionsViewSubmitHarness
+        {
+            private readonly EndpointManifest _manifest = new EndpointManifest
+            {
+                Version = 1,
+                Port = 5105,
+                ProjectRoot = "C:/UnityProject",
+                ProjectId = "busy-sessions-view-submit-project",
+                ServiceProcessId = 5105,
+                UnityProcessId = 1,
+                StartedAtUtc = DateTimeOffset.UtcNow,
+            };
+
+            public List<string> ApiOperations { get; } = new List<string>();
+
+            public ChatEditorWindowClient CreateClient()
+            {
+                var service = new AgentService(
+                    new MockServiceBootstrap(),
+                    new MockServiceBootstrap(),
+                    (_, _) => new BusySessionsViewSubmitApiClient(ApiOperations),
                     (_, _) => new QuietEventStreamClient(),
                     _ => _manifest);
 
@@ -1243,6 +1387,56 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 _apiOperations.Add($"open:{request.SessionId}:ready");
                 return Task.FromResult(new AgentSessionResponseDto(Session1Id, "ready", Array.Empty<AgentServiceEventEnvelope>()));
+            }
+
+            public Task<AgentSessionResponseDto> CreateSessionAsync(CreateAgentSessionRequestDto request, CancellationToken cancellationToken)
+            {
+                _apiOperations.Add($"create:{CreatedSession2Id}");
+                return Task.FromResult(new AgentSessionResponseDto(CreatedSession2Id, "ready", Array.Empty<AgentServiceEventEnvelope>()));
+            }
+
+            public Task SendPromptAsync(SendAgentPromptRequestDto request, CancellationToken cancellationToken)
+            {
+                _apiOperations.Add($"send:{request.SessionId}:{request.Prompt}");
+                return Task.CompletedTask;
+            }
+
+            public Task AbortPromptAsync(AbortAgentPromptRequestDto request, CancellationToken cancellationToken)
+            {
+                _apiOperations.Add($"abort:{request.SessionId}");
+                return Task.CompletedTask;
+            }
+
+            public Task SendToolInvocationResultAsync(AgentToolInvocationResultDto request, CancellationToken cancellationToken)
+                => Task.CompletedTask;
+        }
+
+        private sealed class BusySessionsViewSubmitApiClient : IAgentServiceApiClient
+        {
+            private readonly List<string> _apiOperations;
+
+            public BusySessionsViewSubmitApiClient(List<string> apiOperations)
+            {
+                _apiOperations = apiOperations;
+            }
+
+            public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
+            {
+                _apiOperations.Add("list");
+                return Task.FromResult<IReadOnlyList<SessionSummaryDto>>(new[]
+                {
+                    new SessionSummaryDto(Session1Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 1"),
+                    new SessionSummaryDto(Session2Id, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "Session 2"),
+                });
+            }
+
+            public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
+                => Task.FromResult<IReadOnlyList<ModelInfoDto>>(Array.Empty<ModelInfoDto>());
+
+            public Task<AgentSessionResponseDto> OpenSessionAsync(OpenAgentSessionRequestDto request, CancellationToken cancellationToken)
+            {
+                _apiOperations.Add($"open:{request.SessionId}:streaming");
+                return Task.FromResult(new AgentSessionResponseDto(Session1Id, "streaming", Array.Empty<AgentServiceEventEnvelope>()));
             }
 
             public Task<AgentSessionResponseDto> CreateSessionAsync(CreateAgentSessionRequestDto request, CancellationToken cancellationToken)

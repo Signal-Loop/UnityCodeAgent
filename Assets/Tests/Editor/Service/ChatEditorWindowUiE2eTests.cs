@@ -349,6 +349,35 @@ namespace SignalLoop.UnityCodeAgent.UI
         }
 
         [UnityTest]
+        [Description("Open window, click Send with empty input, verify Send stays available and no prompt is submitted.")]
+        public IEnumerator EmptyPromptSendButtonClick_DoesNothing()
+        {
+            EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
+            yield return WaitForWindowReady();
+
+            var window = FindWindow();
+            Assert.That(window, Is.Not.Null);
+
+            var sendButton = window.rootVisualElement.Q<Button>("send-button");
+            Assert.That(sendButton, Is.Not.Null);
+            Assert.That(sendButton.enabledInHierarchy, Is.True,
+                "Send should remain available even when the composer is empty.");
+
+            var initialMessages = GetMessageContents(window);
+            SubmitPrompt(window, "   ");
+
+            yield return null;
+            yield return null;
+
+            Assert.That(sendButton.enabledInHierarchy, Is.True,
+                "Send should still be available after an empty submission attempt.");
+            Assert.That(GetMessageContents(window), Is.EqualTo(initialMessages),
+                "Clicking Send with empty input should not append a prompt or response.");
+
+            window.Close();
+        }
+
+        [UnityTest]
         [Description("Open window, mark the active session busy, click Stop, verify abort is dispatched without submitting another prompt.")]
         public IEnumerator StopButton_AbortsBusyActiveSessionWithoutSubmittingPrompt()
         {
@@ -521,8 +550,8 @@ namespace SignalLoop.UnityCodeAgent.UI
         }
 
         [UnityTest]
-        [Description("Open window, mark the active session busy, open sessions list, verify the active session is marked unfinished and Send remains the visible action.")]
-        public IEnumerator SessionsList_MarksBusySessionAsUnfinished()
+        [Description("Open window, mark the active session busy, open sessions list, verify opening the list does not create a marker and Send remains the visible action.")]
+        public IEnumerator SessionsList_DoesNotMarkBusySessionWithoutBackgroundEvent()
         {
             EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
             yield return WaitForWindowReady();
@@ -549,7 +578,8 @@ namespace SignalLoop.UnityCodeAgent.UI
                 "Stop should be disabled while the sessions list is open.");
 
             var entry = GetSessionEntry(window, SimpleMockSessionId());
-            Assert.That(entry.ClassListContains("session-entry--unfinished"), Is.True);
+            Assert.That(entry.ClassListContains("session-entry--unfinished"), Is.False,
+                "Opening the sessions list should not create a changed-session marker by itself.");
 
             ClickSessionEntry(window, SimpleMockSessionId());
             yield return WaitUntil(

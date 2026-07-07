@@ -507,9 +507,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             var actionButtonsEnabled = !_isHydratingHistory;
             var isShowingSessions = _chatClient?.IsShowingSessions ?? false;
             var isActiveBusyResponse = _isBusy && !isShowingSessions;
-            var canSend = actionButtonsEnabled
-                && !isActiveBusyResponse
-                && !string.IsNullOrWhiteSpace(_userInput?.value);
+            var canSend = actionButtonsEnabled && !isActiveBusyResponse;
             var canStop = actionButtonsEnabled && isActiveBusyResponse;
             _scrollView?.SetEnabled(true);
             _sessionsScrollView?.SetEnabled(true);
@@ -620,14 +618,12 @@ namespace SignalLoop.UnityCodeAgent.UI
 
             if (agentEvent.Type == AgentEventType.Error)
             {
-                SetBusyState(false);
                 AppendMessage(agentEvent.Type, BuildChatContent(agentEvent, 0, "The request failed."));
                 return;
             }
 
             if (agentEvent.Type == AgentEventType.SessionIdle)
             {
-                SetBusyState(false);
                 if (UnityCodeAgentSettings.GetUnityContext().ShowAllEventsInChat)
                 {
                     AppendMessage(agentEvent.Type, BuildChatContent(agentEvent));
@@ -637,7 +633,6 @@ namespace SignalLoop.UnityCodeAgent.UI
 
             if (agentEvent.Type == AgentEventType.SessionStatusChanged)
             {
-                SetBusyState(AgentSessionStatus.IsBusy(agentEvent.Content));
                 if (UnityCodeAgentSettings.GetUnityContext().ShowAllEventsInChat)
                 {
                     AppendMessage(agentEvent.Type, BuildChatContent(agentEvent));
