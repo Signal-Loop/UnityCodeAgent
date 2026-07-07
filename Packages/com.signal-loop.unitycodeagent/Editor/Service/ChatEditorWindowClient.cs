@@ -69,7 +69,10 @@ namespace SignalLoop.UnityCodeAgent.Service
                 SelectStreamCursor(context, manifest);
                 var session = await _service.GetCurrentSessionAsync(context, cancellationToken).ConfigureAwait(false);
                 SetActiveSession(session.SessionId, sessionRequestSignature, session.Status);
-                _changedSessionIds.Remove(_activeSession.SessionId);
+                if (!_activeSession.IsBusy)
+                {
+                    _changedSessionIds.Remove(_activeSession.SessionId);
+                }
                 _log.Info(nameof(ChatEditorWindowClient), $"Loaded current session history sessionId={_activeSession.SessionId} messages={session.Messages.Count}");
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
@@ -270,7 +273,10 @@ namespace SignalLoop.UnityCodeAgent.Service
                 var resolvedSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? sessionId : session.SessionId;
                 SetActiveSession(resolvedSessionId, CreateSessionRequestSignature(context), session.Status);
                 _isShowingSessions = false;
-                _changedSessionIds.Remove(_activeSession.SessionId);
+                if (!_activeSession.IsBusy)
+                {
+                    _changedSessionIds.Remove(_activeSession.SessionId);
+                }
                 EnsureEventStreamStarted(context);
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
