@@ -477,12 +477,12 @@ namespace SignalLoop.UnityCodeAgent.Service
 
                 if (!_isShowingSessions && IsActiveSession(envelope.SessionId))
                 {
-                    _log.Trace(nameof(ChatEditorWindowClient), $"Applying queued service event eventType={envelope.Type} sessionId={envelope.SessionId} sequence={envelope.SequenceNumber}");
+                    _log.Trace(nameof(ChatEditorWindowClient), $"Applying queued service event eventType={envelope.Type} content={envelope.Content} sessionId={envelope.SessionId} sequence={envelope.SequenceNumber} SourceJson:\n{envelope.SourceJson}");
                     ApplyServiceEvent(context, envelope);
                 }
                 else
                 {
-                    _log.Trace(nameof(ChatEditorWindowClient), $"Applying queued background service event eventType={envelope.Type} sessionId={envelope.SessionId} sequence={envelope.SequenceNumber}");
+                    _log.Trace(nameof(ChatEditorWindowClient), $"Applying queued background service event eventType={envelope.Type} content={envelope.Content} sessionId={envelope.SessionId} sequence={envelope.SequenceNumber} SourceJson:\n{envelope.SourceJson}");
                     ApplyBackgroundServiceEvent(context, envelope);
                 }
             }

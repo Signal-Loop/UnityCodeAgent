@@ -8,9 +8,9 @@
 
 .chat-scroll-view {
   background-color: var(--unity-colors-window-background);
-  padding: 10px;
+  padding: 2px;
   flex-grow: 1;
-  padding: 2px
+  padding-bottom: 0px
 }
 
 .chat-scroll-view--hidden {
@@ -140,7 +140,30 @@
   -unity-font-style: italic;
 }
 
+.chat-progress-message {
+  flex-grow: 0;
+  flex-shrink: 0;
+  margin-top: 0;
+  margin-right: 10px;
+  margin-bottom: 0;
+  margin-left: 8px;
+  padding-top: 0;
+  padding-right: 2px;
+  padding-bottom: 0;
+  padding-left: 2px;
+  color: var(--unity-colors-default-text);
+  white-space: normal;
+}
+
 #chat-message .unity-base-text-field__input {
+  border-left-width: 0;
+  border-right-width: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  background-color: rgba(0, 0, 0, 0);
+}
+
+#progress-message .unity-base-text-field__input {
   border-left-width: 0;
   border-right-width: 0;
   border-top-width: 0;

@@ -23,7 +23,6 @@ namespace SignalLoop.UnityCodeAgent.UI
         internal const string DefaultTemplateAssetPath = "Editor/UI/ChatMessageTemplateDefault.uxml";
         internal const string ErrorTemplateAssetPath = "Editor/UI/ChatMessageTemplateError.uxml";
         internal const string PromptTemplateAssetPath = "Editor/UI/ChatMessageTemplatePrompt.uxml";
-        internal const string ProgressTemplateAssetPath = "Editor/UI/ChatMessageTemplateProgress.uxml";
         internal const string ReasoningTemplateAssetPath = "Editor/UI/ChatMessageTemplateReasoning.uxml";
         internal const string SessionEntryTemplateAssetPath = "Editor/UI/SessionEntryTemplate.uxml";
         internal const string ToolTemplateAssetPath = "Editor/UI/ChatMessageTemplateTool.uxml";
@@ -36,6 +35,7 @@ namespace SignalLoop.UnityCodeAgent.UI
         private Button _settingsButton;
         private Button _sendButton;
         private Button _stopButton;
+        private TextField _progressMessage;
         private Label _modelLabel;
         private readonly Dictionary<string, TextField> _streamedMessageFields = new Dictionary<string, TextField>();
         private ChatEditorWindowClient _chatClient;
@@ -85,6 +85,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             _settingsButton = null;
             _sendButton = null;
             _stopButton = null;
+            _progressMessage = null;
             _modelLabel = null;
             _isBusy = false;
             _transcriptScroller = null;
@@ -111,9 +112,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             _settingsButton = rootVisualElement.Q<Button>("settings-button");
             _sendButton = rootVisualElement.Q<Button>("send-button");
             _stopButton = rootVisualElement.Q<Button>("stop-button");
+            _progressMessage = rootVisualElement.Q<TextField>("progress-message");
             _modelLabel = rootVisualElement.Q<Label>("model-label");
 
-            if (_scrollView == null || _sessionsScrollView == null || _userInput == null || _sessionsButton == null || _settingsButton == null || _sendButton == null || _stopButton == null || _modelLabel == null)
+            if (_scrollView == null || _sessionsScrollView == null || _userInput == null || _sessionsButton == null || _settingsButton == null || _sendButton == null || _stopButton == null || _progressMessage == null || _modelLabel == null)
             {
                 Log.Error(nameof(ChatEditorWindow), "Chat window UI is missing required elements.");
                 rootVisualElement.Clear();
@@ -130,7 +132,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             _sendButton.text = "Send";
             _stopButton.text = "Stop";
             _transcriptScroller = new ChatTranscriptScroller(_scrollView);
-            _progressMessages = new ChatProgressMessages(_scrollView, _transcriptScroller, Log, ProgressTemplateAssetPath);
+            _progressMessages = new ChatProgressMessages(_progressMessage);
             SetBusyState(false);
             SetLoadingState(true);
             _progressMessages.ShowProgressMessage("Opening chat window...");
@@ -202,7 +204,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             _isHydratingHistory = isLoading;
             if (!isLoading && !_isBusy)
             {
-                _progressMessages?.PrepareForVisibleMessage();
+                _progressMessages?.ClearProgress();
             }
 
             rootVisualElement.SetEnabled(true);
@@ -223,6 +225,7 @@ namespace SignalLoop.UnityCodeAgent.UI
 
         private void ShowSessions(IReadOnlyList<SessionSummaryDto> sessions, IReadOnlyCollection<string> unfinishedSessionIds)
         {
+            _progressMessages?.ClearProgressAndPending();
             _sessionsScrollView.contentContainer.Clear();
 
             foreach (var session in sessions)
@@ -755,7 +758,7 @@ namespace SignalLoop.UnityCodeAgent.UI
 
         private void PrepareForVisibleTranscriptMessage()
         {
-            _progressMessages?.PrepareForVisibleMessage();
+            _progressMessages?.NotifyVisibleTranscriptMessage();
         }
 
         private static string GetTemplateAssetPath(AgentEventType eventType)

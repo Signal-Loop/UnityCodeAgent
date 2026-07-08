@@ -73,6 +73,12 @@ namespace SignalLoop.UnityCodeAgent.UI
             return messages;
         }
 
+        private static string GetProgressMessage(ChatEditorWindow window)
+            => window.rootVisualElement.Q<TextField>("progress-message")?.value ?? string.Empty;
+
+        private static DisplayStyle GetProgressDisplay(ChatEditorWindow window)
+            => window.rootVisualElement.Q<TextField>("progress-message")?.style.display.value ?? DisplayStyle.None;
+
         private static ChatEditorWindow FindWindow()
             => Resources.FindObjectsOfTypeAll<ChatEditorWindow>().FirstOrDefault();
 
@@ -272,9 +278,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(sendButton, Is.Not.Null, "The send button should remain present during startup.");
             Assert.That(stopButton, Is.Not.Null, "The stop button should remain present during startup.");
             var messages = GetMessageContents(window);
+            var progressMessage = GetProgressMessage(window);
             var startupProgressMessages = new[] { "Opening chat window...", "Loading current chat session...", "Starting agent service..." };
             Assert.That(
-                messages.Any(message => startupProgressMessages.Contains(message)) || messages.Any(message => message.Contains("transform.position")),
+                startupProgressMessages.Contains(progressMessage) || messages.Any(message => message.Contains("transform.position")),
                 Is.True,
                 "The window should show startup progress or complete startup before the first inspection.");
 
@@ -520,7 +527,7 @@ namespace SignalLoop.UnityCodeAgent.UI
         }
 
         [UnityTest]
-        [Description("Open window, open sessions list, verify long session names are truncated to 60 chars with ellipsis.")]
+        [Description("Open window, open sessions list, verify progress clears and long session names are truncated to 60 chars with ellipsis.")]
         public IEnumerator SessionsList_TruncatesLongSessionNames()
         {
             EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
@@ -529,8 +536,15 @@ namespace SignalLoop.UnityCodeAgent.UI
             var window = FindWindow();
             Assert.That(window, Is.Not.Null);
 
+            window.ShowProgressMessageHandler("Loading chat sessions...");
+            yield return WaitUntil(
+                () => GetProgressMessage(window) == "Loading chat sessions...",
+                "Sessions loading progress was not shown before opening the sessions list.");
+
             OpenSessionsList(window);
             yield return WaitForSessionsList(window, 5);
+            Assert.That(GetProgressMessage(window), Is.Empty,
+                "Sessions loading progress should be cleared once the sessions list is visible.");
 
             var sessionsButton = window.rootVisualElement.Q<Button>("sessions-button");
             Assert.That(sessionsButton, Is.Not.Null);
@@ -598,8 +612,8 @@ namespace SignalLoop.UnityCodeAgent.UI
         }
 
         [UnityTest]
-        [Description("Open window, report progress through the window delegate, verify progress is replaced and removed when an upserted assistant message arrives.")]
-        public IEnumerator ProgressDelegate_ReplacesProgressAndRemovesBeforeUpsertedMessage()
+        [Description("Open window, report progress through the window delegate, verify static progress is replaced without changing transcript count.")]
+        public IEnumerator ProgressDelegate_ReplacesStaticProgressWithoutChangingTranscriptCount()
         {
             EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
             yield return WaitForWindowReady();
@@ -613,7 +627,7 @@ namespace SignalLoop.UnityCodeAgent.UI
                 () =>
                 {
                     var messages = GetMessageContents(window);
-                    return messages.Count == initialCount + 1 && messages.Last() == "Thinking...";
+                    return messages.Count == initialCount && GetProgressMessage(window) == "Thinking...";
                 },
                 "Progress message was not shown.");
 
@@ -622,7 +636,7 @@ namespace SignalLoop.UnityCodeAgent.UI
                 () =>
                 {
                     var messages = GetMessageContents(window);
-                    return messages.Count == initialCount + 1 && messages.Last() == "Analyzing...";
+                    return messages.Count == initialCount && GetProgressMessage(window) == "Analyzing...";
                 },
                 "Progress message was not replaced in place.");
 
@@ -633,16 +647,17 @@ namespace SignalLoop.UnityCodeAgent.UI
                     var messages = GetMessageContents(window);
                     return messages.Count == initialCount + 1
                         && messages.Last() == "Progress resolved."
+                        && GetProgressMessage(window) == "Analyzing..."
                         && !messages.Any(message => message == "Thinking..." || message == "Analyzing...");
                 },
-                "Progress message was not removed before the regular assistant message.");
+                "Progress message changed the transcript or was cleared before the regular assistant message.");
 
             window.Close();
         }
 
         [UnityTest]
-        [Description("Open window, report progress through the window delegate, verify progress is removed before an appended tool message arrives.")]
-        public IEnumerator ProgressDelegate_IsRemovedBeforeAppendedMessage()
+        [Description("Open window, report progress through the window delegate, verify appended tool messages do not remove static progress or use transcript progress.")]
+        public IEnumerator ProgressDelegate_StaticProgressDoesNotAffectAppendedMessage()
         {
             EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
             yield return WaitForWindowReady();
@@ -653,7 +668,7 @@ namespace SignalLoop.UnityCodeAgent.UI
 
             window.ShowProgressMessageHandler("Preparing tool output...");
             yield return WaitUntil(
-                () => GetMessageContents(window).Last() == "Preparing tool output...",
+                () => GetMessageContents(window).Count == initialCount && GetProgressMessage(window) == "Preparing tool output...",
                 "Progress message was not shown before the tool event.");
 
             EnqueueMockEvent(SimpleMockSessionId(), 504, AgentEventType.Tool, "Tool result ready.", "progress-tool-response");
@@ -663,16 +678,17 @@ namespace SignalLoop.UnityCodeAgent.UI
                     var messages = GetMessageContents(window);
                     return messages.Count == initialCount + 1
                         && messages.Last() == "Tool result ready."
+                        && GetProgressMessage(window) == "Preparing tool output..."
                         && !messages.Any(message => message == "Preparing tool output...");
                 },
-                "Progress message was not removed before the appended tool message.");
+                "Progress message changed the transcript before the appended tool message.");
 
             window.Close();
         }
 
         [UnityTest]
-        [Description("Open window, report progress through the window delegate, verify progress is removed before a streamed delta arrives.")]
-        public IEnumerator ProgressDelegate_IsRemovedBeforeStreamedDelta()
+        [Description("Open window, report progress through the window delegate, verify streamed deltas do not remove static progress or use transcript progress.")]
+        public IEnumerator ProgressDelegate_StaticProgressDoesNotAffectStreamedDelta()
         {
             EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
             yield return WaitForWindowReady();
@@ -683,7 +699,7 @@ namespace SignalLoop.UnityCodeAgent.UI
 
             window.ShowProgressMessageHandler("Waiting for stream...");
             yield return WaitUntil(
-                () => GetMessageContents(window).Last() == "Waiting for stream...",
+                () => GetMessageContents(window).Count == initialCount && GetProgressMessage(window) == "Waiting for stream...",
                 "Progress message was not shown before the streamed delta.");
 
             EnqueueMockEvent(SimpleMockSessionId(), 505, AgentEventType.AssistantDelta, "Stream started.", "progress-delta-response");
@@ -693,16 +709,53 @@ namespace SignalLoop.UnityCodeAgent.UI
                     var messages = GetMessageContents(window);
                     return messages.Count == initialCount + 1
                         && messages.Last() == "Stream started."
+                        && GetProgressMessage(window) == "Waiting for stream..."
                         && !messages.Any(message => message == "Waiting for stream...");
                 },
-                "Progress message was not removed before the streamed delta.");
+                "Progress message changed the transcript before the streamed delta.");
 
             window.Close();
         }
 
         [UnityTest]
-        [Description("Open window, report progress through the window delegate, then deliver SessionIdle and verify idle removes trailing progress.")]
-        public IEnumerator ProgressDelegate_IsRemovedWhenChatBecomesNotBusy()
+        [Description("Open window, report progress through the window delegate, then deliver SessionIdle and verify idle clears static progress.")]
+        public IEnumerator ProgressDelegate_IsClearedWhenChatBecomesNotBusy()
+        {
+            EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
+            yield return WaitForWindowReady();
+
+            var window = FindWindow();
+            Assert.That(window, Is.Not.Null);
+            var initialCount = GetMessageContents(window).Count;
+            Assert.That(GetProgressDisplay(window), Is.EqualTo(DisplayStyle.Flex),
+                "Progress field should always reserve layout space, even when empty.");
+
+            window.ShowProgressMessageHandler("Waiting for response...");
+            yield return WaitUntil(
+                () => GetMessageContents(window).Count == initialCount && GetProgressMessage(window) == "Waiting for response...",
+                "Progress message was not shown before idle.");
+            Assert.That(GetProgressDisplay(window), Is.EqualTo(DisplayStyle.Flex),
+                "Progress field should remain in layout while showing progress.");
+
+            EnqueueMockEvent(SimpleMockSessionId(), 602, AgentEventType.SessionIdle, string.Empty, "progress-idle-test");
+            yield return WaitUntil(
+                () =>
+                {
+                    var messages = GetMessageContents(window);
+                    return messages.Count == initialCount
+                        && string.IsNullOrEmpty(GetProgressMessage(window))
+                        && !messages.Any(message => message == "Waiting for response...");
+                },
+                "Progress message was not removed when the chat became idle.");
+            Assert.That(GetProgressDisplay(window), Is.EqualTo(DisplayStyle.Flex),
+                "Progress field should remain in layout after progress clears.");
+
+            window.Close();
+        }
+
+        [UnityTest]
+        [Description("Open window, mark the session busy, verify automatic progress appears in the static field after the initial delay without changing transcript count.")]
+        public IEnumerator BusyState_ShowsStaticProgressAfterDelayWithoutChangingTranscriptCount()
         {
             EditorApplication.ExecuteMenuItem(UnityCodeAgentServiceMenu.MenuRoot + "Open Chat");
             yield return WaitForWindowReady();
@@ -711,20 +764,15 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(window, Is.Not.Null);
             var initialCount = GetMessageContents(window).Count;
 
-            window.ShowProgressMessageHandler("Waiting for response...");
+            EnqueueMockEvent(SimpleMockSessionId(), 603, AgentEventType.SessionStatusChanged, "streaming", "progress-busy-test");
             yield return WaitUntil(
-                () => GetMessageContents(window).Last() == "Waiting for response...",
-                "Progress message was not shown before idle.");
+                () => window.rootVisualElement.Q<Button>("stop-button")?.enabledInHierarchy == true,
+                "Chat window did not enter busy state.");
 
-            EnqueueMockEvent(SimpleMockSessionId(), 602, AgentEventType.SessionIdle, string.Empty, "progress-idle-test");
             yield return WaitUntil(
-                () =>
-                {
-                    var messages = GetMessageContents(window);
-                    return messages.Count == initialCount
-                        && !messages.Any(message => message == "Waiting for response...");
-                },
-                "Progress message was not removed when the chat became idle.");
+                () => GetMessageContents(window).Count == initialCount && !string.IsNullOrWhiteSpace(GetProgressMessage(window)),
+                "Automatic busy progress did not appear in the static progress field.",
+                3d);
 
             window.Close();
         }

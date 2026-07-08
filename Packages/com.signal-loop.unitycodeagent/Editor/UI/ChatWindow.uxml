@@ -3,6 +3,7 @@
     <ui:VisualElement class="chat-window">
         <ui:ScrollView name="scroll-view" class="chat-scroll-view"/>
         <ui:ScrollView name="sessions-scroll-view" class="chat-scroll-view chat-scroll-view--hidden"/>
+        <ui:TextField name="progress-message" readonly="true" multiline="true" class="chat-progress-message chat-message--progress"/>
         <ui:VisualElement class="chat-composer">
             <ui:TextField name="user-input" multiline="true" class="chat-input"/>
             <ui:VisualElement class="chat-actions">
