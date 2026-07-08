@@ -21,6 +21,22 @@ namespace SignalLoop.UnityCodeAgent.UI
     {
     }
 
+    public enum ChatProgressIndicatorCommand
+    {
+        Default,
+        Next,
+    }
+
+    public sealed class ChatSetProgressIndicatorUpdate : ChatClientUpdate
+    {
+        public ChatSetProgressIndicatorUpdate(ChatProgressIndicatorCommand command)
+        {
+            Command = command;
+        }
+
+        public ChatProgressIndicatorCommand Command { get; }
+    }
+
     public sealed class ChatSetBusyStateUpdate : ChatClientUpdate
     {
         public ChatSetBusyStateUpdate(bool isBusy)

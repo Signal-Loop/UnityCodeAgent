@@ -53,6 +53,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _activeSession.ClearRequestSignature();
                 return validationFailure(
                     new ChatSetModelLabelUpdate(ProviderConfigDto.Empty.DisplayName),
+                    ProgressIndicatorDefault(),
                     new ChatSetBusyStateUpdate(false),
                     new ChatShowMessagesUpdate(Array.Empty<AgentServiceEventEnvelope>()));
             }
@@ -76,6 +77,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _log.Info(nameof(ChatEditorWindowClient), $"Loaded current session history sessionId={_activeSession.SessionId} messages={session.Messages.Count}");
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
+                    ProgressIndicatorForBusyState(_activeSession.IsBusy),
                     new ChatSetBusyStateUpdate(_activeSession.IsBusy),
                     new ChatShowMessagesUpdate(session.Messages));
             }
@@ -87,6 +89,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _activeSession.SetRequestSignature(TryCreateSessionRequestSignature(context));
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
+                    ProgressIndicatorDefault(),
                     new ChatSetBusyStateUpdate(false),
                     new ChatShowMessagesUpdate(Array.Empty<AgentServiceEventEnvelope>()));
             }
@@ -98,6 +101,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _activeSession.SetRequestSignature(TryCreateSessionRequestSignature(context));
                 return Failure(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
+                    ProgressIndicatorDefault(),
                     new ChatSetBusyStateUpdate(false),
                     new ChatShowMessagesUpdate(Array.Empty<AgentServiceEventEnvelope>()),
                     new ChatShowErrorUpdate(exception.Message, exception.ToString()));
@@ -143,6 +147,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 }
 
                 invalidUpdates.Add(new ChatSetModelLabelUpdate(ProviderConfigDto.Empty.DisplayName));
+                invalidUpdates.Add(ProgressIndicatorDefault());
                 invalidUpdates.Add(new ChatSetBusyStateUpdate(false));
                 return validationFailure(invalidUpdates.ToArray());
             }
@@ -175,6 +180,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                     string.Empty,
                     false)));
                 EnqueueUpdate(new ChatSetUserInput(string.Empty));
+                EnqueueUpdate(ProgressIndicatorNext());
                 EnqueueUpdate(new ChatSetBusyStateUpdate(true));
 
                 if (string.IsNullOrWhiteSpace(_activeSession.SessionId))
@@ -198,6 +204,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 SetActiveSessionStatus("ready");
                 _log.Error(nameof(ChatEditorWindowClient), "Prompt submission failed.", exception);
                 EnqueueUpdate(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
+                EnqueueUpdate(ProgressIndicatorDefault());
                 EnqueueUpdate(new ChatSetBusyStateUpdate(false));
                 return Failure(updates);
             }
@@ -243,12 +250,12 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 var sessions = await _service.GetSessionsAsync(context, cancellationToken).ConfigureAwait(false);
                 _isShowingSessions = true;
-                return Success(new ChatShowSessionsUpdate(sessions, _changedSessionIds));
+                return Success(ProgressIndicatorDefault(), new ChatShowSessionsUpdate(sessions, _changedSessionIds));
             }
             catch (Exception exception)
             {
                 _log.Error(nameof(ChatEditorWindowClient), "Loading session list failed.", exception);
-                return Failure(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
+                return Failure(ProgressIndicatorDefault(), new ChatShowErrorUpdate(exception.Message, exception.ToString()));
             }
         }
 
@@ -263,6 +270,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 return validationFailure(
                     new ChatSetModelLabelUpdate(ProviderConfigDto.Empty.DisplayName),
+                    ProgressIndicatorDefault(),
                     new ChatSetBusyStateUpdate(false));
             }
 
@@ -280,6 +288,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 EnsureEventStreamStarted(context);
                 return Success(
                     new ChatSetModelLabelUpdate(modelSelection.DisplayName),
+                    ProgressIndicatorForBusyState(_activeSession.IsBusy),
                     new ChatSetBusyStateUpdate(_activeSession.IsBusy),
                     new ChatShowMessagesUpdate(session.Messages));
             }
@@ -287,7 +296,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 EnsureEventStreamStarted(context);
                 _log.Error(nameof(ChatEditorWindowClient), $"Opening session failed sessionId={sessionId}", exception);
-                return Failure(new ChatShowErrorUpdate(exception.Message, exception.ToString()));
+                return Failure(ProgressIndicatorDefault(), new ChatShowErrorUpdate(exception.Message, exception.ToString()));
             }
         }
 
@@ -374,6 +383,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _isEventStreamStarted = false;
                 _log.Error(nameof(ChatEditorWindowClient), "Agent stream observation failed.", exception);
                 EnqueueUpdate(new ChatShowErrorUpdate("Agent stream observation failed.", exception.ToString()));
+                EnqueueUpdate(ProgressIndicatorDefault());
                 EnqueueUpdate(new ChatSetBusyStateUpdate(false));
             }
         }
@@ -474,6 +484,10 @@ namespace SignalLoop.UnityCodeAgent.Service
                 }
 
                 AcceptServiceEvent(context, envelope);
+                if (!_isShowingSessions)
+                {
+                    EnqueueUpdate(ProgressIndicatorNext());
+                }
 
                 if (!_isShowingSessions && IsActiveSession(envelope.SessionId))
                 {
@@ -530,6 +544,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             if (hasBusyStateUpdate)
             {
+                EnqueueUpdate(ProgressIndicatorForBusyState(nextBusyState));
                 EnqueueUpdate(new ChatSetBusyStateUpdate(nextBusyState));
             }
 
@@ -681,6 +696,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             try
             {
+                EnqueueUpdate(ProgressIndicatorNext());
                 EnqueueUpdate(new ChatSetBusyStateUpdate(true));
                 var session = await _service.OpenSessionAsync(context, _activeSession.SessionId, cancellationToken).ConfigureAwait(false);
                 var resolvedSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? _activeSession.SessionId : session.SessionId;
@@ -699,6 +715,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
             finally
             {
+                EnqueueUpdate(ProgressIndicatorForBusyState(_activeSession.IsBusy));
                 EnqueueUpdate(new ChatSetBusyStateUpdate(_activeSession.IsBusy));
             }
         }
@@ -774,6 +791,15 @@ namespace SignalLoop.UnityCodeAgent.Service
                 _pendingClientUpdates.Enqueue(update);
             }
         }
+
+        private static ChatSetProgressIndicatorUpdate ProgressIndicatorDefault()
+            => new ChatSetProgressIndicatorUpdate(ChatProgressIndicatorCommand.Default);
+
+        private static ChatSetProgressIndicatorUpdate ProgressIndicatorNext()
+            => new ChatSetProgressIndicatorUpdate(ChatProgressIndicatorCommand.Next);
+
+        private static ChatSetProgressIndicatorUpdate ProgressIndicatorForBusyState(bool isBusy)
+            => isBusy ? ProgressIndicatorNext() : ProgressIndicatorDefault();
 
         private void ClearQueuedProgressUpdates()
         {

@@ -79,6 +79,27 @@ namespace SignalLoop.UnityCodeAgent.UI
         private static DisplayStyle GetProgressDisplay(ChatEditorWindow window)
             => window.rootVisualElement.Q<TextField>("progress-message")?.style.display.value ?? DisplayStyle.None;
 
+        private static VisualElement GetProgressIndicator(ChatEditorWindow window)
+            => window.rootVisualElement.Q<VisualElement>(ChatProgressIndicator.ElementName);
+
+        private static bool HasSpectrumIndicatorClass(VisualElement indicator)
+        {
+            if (indicator == null)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < 8; index++)
+            {
+                if (indicator.ClassListContains($"{ChatProgressIndicator.SpectrumClassPrefix}{index}"))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static ChatEditorWindow FindWindow()
             => Resources.FindObjectsOfTypeAll<ChatEditorWindow>().FirstOrDefault();
 
@@ -279,7 +300,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             Assert.That(stopButton, Is.Not.Null, "The stop button should remain present during startup.");
             var messages = GetMessageContents(window);
             var progressMessage = GetProgressMessage(window);
+            var progressIndicator = GetProgressIndicator(window);
             var startupProgressMessages = new[] { "Opening chat window...", "Loading current chat session...", "Starting agent service..." };
+            Assert.That(progressIndicator, Is.Not.Null, "The progress indicator should be present during startup.");
+            Assert.That(progressIndicator.ClassListContains(ChatProgressIndicator.DefaultClassName), Is.True);
             Assert.That(
                 startupProgressMessages.Contains(progressMessage) || messages.Any(message => message.Contains("transform.position")),
                 Is.True,
@@ -310,6 +334,11 @@ namespace SignalLoop.UnityCodeAgent.UI
             var root = window.rootVisualElement;
             Assert.That(root.Q<ScrollView>("scroll-view"), Is.Not.Null);
             Assert.That(root.Q<TextField>("user-input"), Is.Not.Null);
+            var progressIndicator = root.Q<VisualElement>(ChatProgressIndicator.ElementName);
+            Assert.That(progressIndicator, Is.Not.Null);
+            Assert.That(progressIndicator.resolvedStyle.width, Is.EqualTo(8f).Within(0.1f));
+            Assert.That(progressIndicator.resolvedStyle.height, Is.EqualTo(8f).Within(0.1f));
+            Assert.That(progressIndicator.ClassListContains(ChatProgressIndicator.DefaultClassName), Is.True);
             Assert.That(root.Q<Button>("send-button"), Is.Not.Null);
             Assert.That(root.Q<Button>("stop-button"), Is.Not.Null);
             Assert.That(root.Q<Button>("sessions-button"), Is.Not.Null);
@@ -409,6 +438,8 @@ namespace SignalLoop.UnityCodeAgent.UI
                         && stopButton.enabledInHierarchy;
                 },
                 "Chat window did not enable Stop for the busy active session.");
+            Assert.That(HasSpectrumIndicatorClass(GetProgressIndicator(window)), Is.True,
+                "The progress indicator should use a ZX Spectrum state while the active session is busy.");
 
             var userInput = window.rootVisualElement.Q<TextField>("user-input");
             userInput.value = "this should not be submitted";
@@ -545,6 +576,8 @@ namespace SignalLoop.UnityCodeAgent.UI
             yield return WaitForSessionsList(window, 5);
             Assert.That(GetProgressMessage(window), Is.Empty,
                 "Sessions loading progress should be cleared once the sessions list is visible.");
+            Assert.That(GetProgressIndicator(window).ClassListContains(ChatProgressIndicator.DefaultClassName), Is.True,
+                "The progress indicator should return to its default state on the sessions list.");
 
             var sessionsButton = window.rootVisualElement.Q<Button>("sessions-button");
             Assert.That(sessionsButton, Is.Not.Null);

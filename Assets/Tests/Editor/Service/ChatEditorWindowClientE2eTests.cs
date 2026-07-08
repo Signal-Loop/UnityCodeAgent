@@ -226,6 +226,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var busyUpdates = result.Updates.OfType<ChatSetBusyStateUpdate>();
             Assert.That(busyUpdates.Any(), Is.True);
             Assert.That(busyUpdates.Last().IsBusy, Is.False);
+            Assert.That(result.Updates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Default));
         }
 
         [Test]
@@ -240,6 +241,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             Assert.That(result.Success, Is.True);
             Assert.That(result.Updates.OfType<ChatSetBusyStateUpdate>().Last().IsBusy, Is.True);
+            Assert.That(result.Updates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Next));
         }
 
         [Test]
@@ -254,6 +256,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             Assert.That(result.Success, Is.True);
             Assert.That(result.Updates.OfType<ChatSetBusyStateUpdate>().Last().IsBusy, Is.False);
+            Assert.That(result.Updates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Default));
         }
 
         // ──────────────────────────────────────────────
@@ -293,6 +296,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var agentEvents = updates.OfType<ChatShowAgentEventUpdate>()
                 .Select(u => u.AgentEvent)
                 .ToList();
+            Assert.That(updates.OfType<ChatSetProgressIndicatorUpdate>().First().Command, Is.EqualTo(ChatProgressIndicatorCommand.Next));
 
             // We should have: [0] user echo, [1..n] assistant response events
             Assert.That(agentEvents.Count >= 2, Is.True);
@@ -307,6 +311,8 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var idleEvents = agentEvents.Where(e => e.Type == AgentEventType.SessionIdle).ToList();
             Assert.That(idleEvents.Count >= 1, Is.True);
+            Assert.That(updates.OfType<ChatSetProgressIndicatorUpdate>().Any(update => update.Command == ChatProgressIndicatorCommand.Next), Is.True);
+            Assert.That(updates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Default));
         }
 
         // ──────────────────────────────────────────────
@@ -880,6 +886,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var sessionsResult = await client.ShowSessionsAsync(context, CancellationToken.None);
             Assert.That(sessionsResult.Success, Is.True);
+            Assert.That(sessionsResult.Updates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Default));
             var showSessions = sessionsResult.Updates.OfType<ChatShowSessionsUpdate>().Single();
             Assert.That(showSessions.UnfinishedSessionIds, Does.Not.Contain(Session1Id));
 

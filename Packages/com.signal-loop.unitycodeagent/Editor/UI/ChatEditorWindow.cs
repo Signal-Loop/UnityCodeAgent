@@ -35,6 +35,7 @@ namespace SignalLoop.UnityCodeAgent.UI
         private Button _settingsButton;
         private Button _sendButton;
         private Button _stopButton;
+        private VisualElement _progressIndicatorElement;
         private TextField _progressMessage;
         private Label _modelLabel;
         private readonly Dictionary<string, TextField> _streamedMessageFields = new Dictionary<string, TextField>();
@@ -44,6 +45,7 @@ namespace SignalLoop.UnityCodeAgent.UI
         private bool _isBusy;
         private ChatTranscriptScroller _transcriptScroller;
         private ChatProgressMessages _progressMessages;
+        private ChatProgressIndicator _progressIndicator;
 
         public Action<string> ShowProgressMessageHandler => content => _progressMessages?.ShowProgressMessage(content);
 
@@ -85,11 +87,13 @@ namespace SignalLoop.UnityCodeAgent.UI
             _settingsButton = null;
             _sendButton = null;
             _stopButton = null;
+            _progressIndicatorElement = null;
             _progressMessage = null;
             _modelLabel = null;
             _isBusy = false;
             _transcriptScroller = null;
             _progressMessages = null;
+            _progressIndicator = null;
             _isHydratingHistory = false;
             _streamedMessageFields.Clear();
 
@@ -112,10 +116,11 @@ namespace SignalLoop.UnityCodeAgent.UI
             _settingsButton = rootVisualElement.Q<Button>("settings-button");
             _sendButton = rootVisualElement.Q<Button>("send-button");
             _stopButton = rootVisualElement.Q<Button>("stop-button");
+            _progressIndicatorElement = rootVisualElement.Q<VisualElement>(ChatProgressIndicator.ElementName);
             _progressMessage = rootVisualElement.Q<TextField>("progress-message");
             _modelLabel = rootVisualElement.Q<Label>("model-label");
 
-            if (_scrollView == null || _sessionsScrollView == null || _userInput == null || _sessionsButton == null || _settingsButton == null || _sendButton == null || _stopButton == null || _progressMessage == null || _modelLabel == null)
+            if (_scrollView == null || _sessionsScrollView == null || _userInput == null || _sessionsButton == null || _settingsButton == null || _sendButton == null || _stopButton == null || _progressIndicatorElement == null || _progressMessage == null || _modelLabel == null)
             {
                 Log.Error(nameof(ChatEditorWindow), "Chat window UI is missing required elements.");
                 rootVisualElement.Clear();
@@ -133,6 +138,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             _stopButton.text = "Stop";
             _transcriptScroller = new ChatTranscriptScroller(_scrollView);
             _progressMessages = new ChatProgressMessages(_progressMessage);
+            _progressIndicator = new ChatProgressIndicator(_progressIndicatorElement);
             SetBusyState(false);
             SetLoadingState(true);
             _progressMessages.ShowProgressMessage("Opening chat window...");
@@ -150,6 +156,7 @@ namespace SignalLoop.UnityCodeAgent.UI
             _transcriptScroller?.Reset();
             _transcriptScroller = null;
             _progressMessages = null;
+            _progressIndicator = null;
         }
 
         private async Task<bool> SubmitPromptAsync()
@@ -469,6 +476,9 @@ namespace SignalLoop.UnityCodeAgent.UI
         {
             switch (update)
             {
+                case ChatSetProgressIndicatorUpdate progressIndicator:
+                    _progressIndicator?.Apply(progressIndicator.Command);
+                    break;
                 case ChatSetBusyStateUpdate busy:
                     SetBusyState(busy.IsBusy);
                     break;

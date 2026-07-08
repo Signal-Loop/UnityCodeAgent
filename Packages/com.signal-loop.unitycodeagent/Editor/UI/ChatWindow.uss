@@ -140,13 +140,71 @@
   -unity-font-style: italic;
 }
 
+.chat-progress-row {
+  flex-direction: row;
+  align-items: center;
+  flex-grow: 0;
+  flex-shrink: 0;
+  margin-top: 0;
+  margin-right: 0px;
+  margin-bottom: 0;
+  margin-left: 10px;
+}
+
+.chat-progress-indicator {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  max-width: 8px;
+  max-height: 8px;
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+
+.chat-progress-indicator--default {
+  background-color: #777777;
+}
+
+.chat-progress-indicator--spectrum-0 {
+  background-color: #000000;
+}
+
+.chat-progress-indicator--spectrum-1 {
+  background-color: #0000FF;
+}
+
+.chat-progress-indicator--spectrum-2 {
+  background-color: #FF0000;
+}
+
+.chat-progress-indicator--spectrum-3 {
+  background-color: #FF00FF;
+}
+
+.chat-progress-indicator--spectrum-4 {
+  background-color: #00FF00;
+}
+
+.chat-progress-indicator--spectrum-5 {
+  background-color: #00FFFF;
+}
+
+.chat-progress-indicator--spectrum-6 {
+  background-color: #FFFF00;
+}
+
+.chat-progress-indicator--spectrum-7 {
+  background-color: #FFFFFF;
+}
+
 .chat-progress-message {
   flex-grow: 0;
   flex-shrink: 0;
   margin-top: 0;
-  margin-right: 10px;
+  margin-right: 0;
   margin-bottom: 0;
-  margin-left: 8px;
+  margin-left: 0;
   padding-top: 0;
   padding-right: 2px;
   padding-bottom: 0;
