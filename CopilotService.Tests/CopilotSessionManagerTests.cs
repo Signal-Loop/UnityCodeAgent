@@ -14,6 +14,64 @@ namespace UnityCodeCopilot.Service.Tests;
 public sealed class CopilotSessionManagerTests
 {
     [Test]
+    public async Task RuntimeEvents_UnsupportedImageInputSuppressesFollowingGenericProvider404()
+    {
+        var host = new FakeRuntimeHost();
+        var broker = new EventStreamBroker();
+        await using var manager = CreateManager(host, broker);
+        await manager.CreateAsync(CreateRequest("session-1"), CancellationToken.None);
+
+        host.Sessions["session-1"].Raise(CreateUnsupportedImageFailure());
+        host.Sessions["session-1"].Raise(new SessionErrorEvent
+        {
+            Data = new SessionErrorData
+            {
+                ErrorType = "query",
+                Message = "Resource not found on provider.",
+                StatusCode = 404,
+            },
+            Timestamp = DateTimeOffset.UnixEpoch,
+        });
+
+        using var subscription = broker.Subscribe(0);
+        var errors = subscription.RetainedEvents.Where(item => item.Type == AgentEventType.Error).ToArray();
+        Assert.That(errors, Has.Length.EqualTo(1));
+        Assert.That(errors[0].Content, Does.Contain("not available for image input"));
+        Assert.That(errors[0].Content, Does.Not.Contain("BaseUrl"));
+    }
+
+    [Test]
+    public async Task SteerScreenshotAsync_ForwardsValidPngToRequestedSessionOnly()
+    {
+        var host = new FakeRuntimeHost();
+        await using var manager = CreateManager(host);
+        await manager.CreateAsync(CreateRequest("session-1"), CancellationToken.None);
+        await manager.CreateAsync(CreateRequest("session-2"), CancellationToken.None);
+        var png = new AgentToolBinaryResultDto("iVBORw0KGgo=", "image/png", "image");
+
+        await manager.SteerScreenshotAsync("session-2", png, CancellationToken.None);
+
+        Assert.That(host.Sessions["session-1"].SteeredScreenshots, Is.Empty);
+        Assert.That(host.Sessions["session-2"].SteeredScreenshots, Is.EqualTo(new[] { (png.Data, png.MimeType) }));
+    }
+
+    [TestCase("not-base64", "image/png")]
+    [TestCase("iVBORw0KGgo=", "image/jpeg")]
+    public async Task SteerScreenshotAsync_RejectsInvalidImageBeforeRuntimeSend(string data, string mimeType)
+    {
+        var host = new FakeRuntimeHost();
+        await using var manager = CreateManager(host);
+        await manager.CreateAsync(CreateRequest("session-1"), CancellationToken.None);
+
+        Assert.ThrowsAsync<ArgumentException>(async () =>
+            await manager.SteerScreenshotAsync(
+                "session-1",
+                new AgentToolBinaryResultDto(data, mimeType, "image"),
+                CancellationToken.None));
+        Assert.That(host.Sessions["session-1"].SteeredScreenshots, Is.Empty);
+    }
+
+    [Test]
     [Description("Goal: prove creating a second runtime session does not detach or dispose the first attached session. Scope: CopilotSessionManager attachment bookkeeping only. Boundaries: excludes real Copilot SDK transport and persisted event conversion.")]
     public async Task CreateAsync_KeepsPreviouslyAttachedSessionAlive()
     {
@@ -157,9 +215,9 @@ public sealed class CopilotSessionManagerTests
         Assert.That(exception.InnerException, Is.TypeOf<HttpRequestException>());
     }
 
-    private static CopilotSessionManager CreateManager(FakeRuntimeHost host)
+    private static CopilotSessionManager CreateManager(FakeRuntimeHost host, EventStreamBroker? broker = null)
         => new(
-            new EventStreamBroker(),
+            broker ?? new EventStreamBroker(),
             host,
             new UnityCodeCopilotServiceLogger(
                 new ProjectPaths(AppContext.BaseDirectory),
@@ -169,6 +227,27 @@ public sealed class CopilotSessionManagerTests
                     MinLogLevel = UnityCodeCopilotServiceLogger.LogLevel.Off,
                 }),
             new CopilotTelemetry());
+
+    private static ModelCallFailureEvent CreateUnsupportedImageFailure()
+        => new()
+        {
+            Data = new ModelCallFailureData
+            {
+                ErrorMessage = """{"message":"No endpoints found that support image input","code":404}""",
+                StatusCode = 404,
+                Source = ModelCallFailureSource.TopLevel,
+                RequestFingerprint = new ModelCallFailureRequestFingerprint
+                {
+                    ImagePartCount = 1,
+                    ImagePartsMissingMediaType = 0,
+                    MessageCount = 5,
+                    NamelessToolCallCount = 0,
+                    ToolCallCount = 1,
+                    ToolResultMessageCount = 1,
+                },
+            },
+            Timestamp = DateTimeOffset.UnixEpoch,
+        };
 
     private static CreateAgentSessionRequestDto CreateRequest(string sessionId, string model = "gpt-4o")
         => new(sessionId, new ProviderConfigDto(model), true, new InfiniteSessionsDto(), AppContext.BaseDirectory);
@@ -237,6 +316,8 @@ public sealed class CopilotSessionManagerTests
 
         public List<string> SentPrompts { get; } = new();
 
+        public List<(string Data, string MimeType)> SteeredScreenshots { get; } = new();
+
         public Exception? SendException { get; set; }
 
         public int AbortCount { get; private set; }
@@ -249,7 +330,15 @@ public sealed class CopilotSessionManagerTests
             => Task.FromResult<IReadOnlyList<SessionEvent>>(Array.Empty<SessionEvent>());
 
         public IDisposable OnSessionEvent(Action<SessionEvent> handler)
-            => Subscription;
+        {
+            EventHandler = handler;
+            return Subscription;
+        }
+
+        public Action<SessionEvent>? EventHandler { get; private set; }
+
+        public void Raise(SessionEvent sessionEvent)
+            => EventHandler?.Invoke(sessionEvent);
 
         public Task SendPromptAsync(string prompt, CancellationToken cancellationToken)
         {
@@ -259,6 +348,12 @@ public sealed class CopilotSessionManagerTests
             }
 
             SentPrompts.Add(prompt);
+            return Task.CompletedTask;
+        }
+
+        public Task SteerScreenshotAsync(string base64Data, string mimeType, CancellationToken cancellationToken)
+        {
+            SteeredScreenshots.Add((base64Data, mimeType));
             return Task.CompletedTask;
         }
 

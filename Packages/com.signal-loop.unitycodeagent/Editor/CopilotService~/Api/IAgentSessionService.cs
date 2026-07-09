@@ -12,5 +12,7 @@ public interface IAgentSessionService
 
     Task SendAsync(SendAgentPromptRequestDto request, CancellationToken cancellationToken);
 
+    Task SteerScreenshotAsync(string sessionId, AgentToolBinaryResultDto screenshot, CancellationToken cancellationToken);
+
     Task AbortAsync(AbortAgentPromptRequestDto request, CancellationToken cancellationToken);
 }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using GitHub.Copilot;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,6 +11,7 @@ using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using SignalLoop.UnityCodeAgent.Contracts;
 using UnityCodeCopilot.Service.Api;
+using UnityCodeCopilot.Service.Copilot;
 using UnityCodeCopilot.Service.Infrastructure;
 
 // Test file goal: verify the hosted service endpoints match the shared OpenAPI and AsyncAPI artifacts.
@@ -20,6 +22,101 @@ namespace UnityCodeCopilot.Service.Tests;
 
 public sealed class AgentServiceEndpointContractTests
 {
+    [Test]
+    public async Task CompleteToolInvocation_ValidScreenshotSteersBeforeCompletingWithoutBinary()
+    {
+        await using var factory = new AgentServiceApplicationFactory();
+        using var client = factory.CreateClient();
+        var invocationTask = factory.Tools.InvokeAsync(new ToolInvocation
+        {
+            SessionId = "session-1",
+            ToolCallId = "call-1",
+            ToolName = "get_unity_game_view_window_screenshot",
+            Arguments = System.Text.Json.JsonSerializer.SerializeToElement(new { }),
+        }, CancellationToken.None);
+
+        using var response = await client.PostAsync("/api/tools/results", CreateJsonContent("""
+            {
+              "CallId": "call-1",
+              "SessionId": "session-1",
+              "ToolName": "get_unity_game_view_window_screenshot",
+              "IsError": false,
+              "TextResult": "Saved screenshot",
+              "BinaryResults": [{
+                "Data": "iVBORw0KGgo=",
+                "MimeType": "image/png",
+                "Type": "image"
+              }]
+            }
+            """));
+        var result = await invocationTask;
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
+        Assert.That(factory.Sessions.LastSteeredScreenshot?.SessionId, Is.EqualTo("session-1"));
+        Assert.That(result.Result.BinaryResultsForLlm, Is.Null);
+        Assert.That(result.Result.TextResultForLlm, Is.EqualTo("Saved screenshot"));
+    }
+
+    [Test]
+    public async Task CompleteToolInvocation_DuplicateScreenshotDoesNotSteerTwice()
+    {
+        await using var factory = new AgentServiceApplicationFactory();
+        using var client = factory.CreateClient();
+        var invocationTask = factory.Tools.InvokeAsync(new ToolInvocation
+        {
+            SessionId = "session-1",
+            ToolCallId = "call-1",
+            ToolName = "get_unity_game_view_window_screenshot",
+            Arguments = System.Text.Json.JsonSerializer.SerializeToElement(new { }),
+        }, CancellationToken.None);
+        const string json = """
+            {
+              "CallId": "call-1", "SessionId": "session-1",
+              "ToolName": "get_unity_game_view_window_screenshot",
+              "IsError": false, "TextResult": "Saved screenshot",
+              "BinaryResults": [{ "Data": "iVBORw0KGgo=", "MimeType": "image/png", "Type": "image" }]
+            }
+            """;
+
+        using var first = await client.PostAsync("/api/tools/results", CreateJsonContent(json));
+        await invocationTask;
+        using var duplicate = await client.PostAsync("/api/tools/results", CreateJsonContent(json));
+
+        Assert.That(first.StatusCode, Is.EqualTo(HttpStatusCode.Accepted));
+        Assert.That(duplicate.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        Assert.That(factory.Sessions.SteerCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task CompleteToolInvocation_SteeringFailureCompletesToolWithExplicitError()
+    {
+        await using var factory = new AgentServiceApplicationFactory();
+        factory.Sessions.SteerExceptionToThrow = new InvalidOperationException("runtime send failed");
+        using var client = factory.CreateClient();
+        var invocationTask = factory.Tools.InvokeAsync(new ToolInvocation
+        {
+            SessionId = "session-1",
+            ToolCallId = "call-1",
+            ToolName = "get_unity_game_view_window_screenshot",
+            Arguments = System.Text.Json.JsonSerializer.SerializeToElement(new { }),
+        }, CancellationToken.None);
+
+        using var response = await client.PostAsync("/api/tools/results", CreateJsonContent("""
+            {
+              "CallId": "call-1", "SessionId": "session-1",
+              "ToolName": "get_unity_game_view_window_screenshot",
+              "IsError": false, "TextResult": "Saved screenshot",
+              "BinaryResults": [{ "Data": "iVBORw0KGgo=", "MimeType": "image/png", "Type": "image" }]
+            }
+            """));
+        var result = await invocationTask;
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(result.Result.ResultType, Is.EqualTo("failure"));
+        Assert.That(result.Result.Error, Is.EqualTo("Game View screenshot could not be attached for visual analysis."));
+        Assert.That(result.Result.BinaryResultsForLlm, Is.Null);
+    }
+
     [Test]
     [Description("Goal: verify the health endpoint returns the documented healthy response body and status. Scope: in-process Program hosting and /health response serialization only. Boundaries: excludes startup manifest publication, external liveness checks, and degraded-state transitions.")]
     public async Task Health_ReturnsOpenApiHealthyExample()
@@ -251,6 +348,8 @@ public sealed class AgentServiceEndpointContractTests
 
         public FakeAgentModelCatalog Models { get; } = new(specs);
 
+        public AgentToolInvocationBridge Tools => Services.GetRequiredService<AgentToolInvocationBridge>();
+
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
         {
             builder.UseSetting(Microsoft.AspNetCore.Hosting.WebHostDefaults.EnvironmentKey, "Testing");
@@ -307,6 +406,12 @@ public sealed class AgentServiceEndpointContractTests
 
         public AbortAgentPromptRequestDto? LastAbortRequest { get; private set; }
 
+        public (string SessionId, AgentToolBinaryResultDto Screenshot)? LastSteeredScreenshot { get; private set; }
+
+        public Exception? SteerExceptionToThrow { get; set; }
+
+        public int SteerCount { get; private set; }
+
         public Exception? CreateExceptionToThrow { get; set; }
 
         public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
@@ -332,6 +437,18 @@ public sealed class AgentServiceEndpointContractTests
         public Task SendAsync(SendAgentPromptRequestDto request, CancellationToken cancellationToken)
         {
             LastSendRequest = request;
+            return Task.CompletedTask;
+        }
+
+        public Task SteerScreenshotAsync(string sessionId, AgentToolBinaryResultDto screenshot, CancellationToken cancellationToken)
+        {
+            SteerCount++;
+            LastSteeredScreenshot = (sessionId, screenshot);
+            if (SteerExceptionToThrow != null)
+            {
+                throw SteerExceptionToThrow;
+            }
+
             return Task.CompletedTask;
         }
 

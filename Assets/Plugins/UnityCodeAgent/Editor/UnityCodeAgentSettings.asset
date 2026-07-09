@@ -43,17 +43,17 @@ MonoBehaviour:
   SkillsTargetPath: .agents/skills
   _hasInitializedSkillsInstallTarget: 1
   Model:
-    Id: xiaomi/mimo-v2.5
-    Name: 'Xiaomi: MiMo-V2.5'
+    Id: minimax/minimax-m3
+    Name: 'MiniMax: MiniMax M3'
   AvailableModels:
   - Id: ai21/jamba-large-1.7
     Name: 'AI21: Jamba Large 1.7'
-  - Id: aion-labs/aion-1.0
-    Name: 'AionLabs: Aion-1.0'
-  - Id: aion-labs/aion-1.0-mini
-    Name: 'AionLabs: Aion-1.0-Mini'
   - Id: aion-labs/aion-2.0
     Name: 'AionLabs: Aion-2.0'
+  - Id: aion-labs/aion-3.0
+    Name: 'AionLabs: Aion-3.0'
+  - Id: aion-labs/aion-3.0-mini
+    Name: 'AionLabs: Aion-3.0-Mini'
   - Id: aion-labs/aion-rp-llama-3.1-8b
     Name: 'AionLabs: Aion-RP 1.0 (8B)'
   - Id: allenai/olmo-3-32b-think
@@ -104,6 +104,8 @@ MonoBehaviour:
     Name: 'Anthropic: Claude Sonnet 4.5'
   - Id: anthropic/claude-sonnet-4.6
     Name: 'Anthropic: Claude Sonnet 4.6'
+  - Id: anthropic/claude-sonnet-5
+    Name: 'Anthropic: Claude Sonnet 5'
   - Id: arcee-ai/coder-large
     Name: 'Arcee AI: Coder Large'
   - Id: arcee-ai/trinity-large-thinking
@@ -220,6 +222,8 @@ MonoBehaviour:
     Name: 'Google: Nano Banana 2 (Gemini 3.1 Flash Image Preview)'
   - Id: google/gemini-3.1-flash-image
     Name: 'Google: Nano Banana 2 (Gemini 3.1 Flash Image)'
+  - Id: google/gemini-3.1-flash-lite-image
+    Name: 'Google: Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)'
   - Id: google/gemini-3-pro-image-preview
     Name: 'Google: Nano Banana Pro (Gemini 3 Pro Image Preview)'
   - Id: google/gemini-3-pro-image
@@ -236,8 +240,6 @@ MonoBehaviour:
     Name: 'Inflection: Inflection 3 Productivity'
   - Id: kwaipilot/kat-coder-pro-v2
     Name: 'Kwaipilot: KAT-Coder-Pro V2'
-  - Id: liquid/lfm-2-24b-a2b
-    Name: 'LiquidAI: LFM2-24B-A2B'
   - Id: liquid/lfm-2.5-1.2b-instruct:free
     Name: 'LiquidAI: LFM2.5-1.2B-Instruct (free)'
   - Id: liquid/lfm-2.5-1.2b-thinking:free
@@ -272,8 +274,6 @@ MonoBehaviour:
     Name: 'Meta: Llama Guard 4 12B'
   - Id: microsoft/phi-4
     Name: 'Microsoft: Phi 4'
-  - Id: microsoft/phi-4-mini-instruct
-    Name: 'Microsoft: Phi 4 Mini Instruct'
   - Id: minimax/minimax-m1
     Name: 'MiniMax: MiniMax M1'
   - Id: minimax/minimax-m2
@@ -370,6 +370,8 @@ MonoBehaviour:
     Name: 'NVIDIA: Nemotron Nano 12B 2 VL (free)'
   - Id: nvidia/nemotron-nano-9b-v2:free
     Name: 'NVIDIA: Nemotron Nano 9B V2 (free)'
+  - Id: nex-agi/nex-n2-mini
+    Name: 'Nex AGI: Nex-N2-Mini'
   - Id: nex-agi/nex-n2-pro
     Name: 'Nex AGI: Nex-N2-Pro'
   - Id: nousresearch/hermes-3-llama-3.1-405b
@@ -530,6 +532,10 @@ MonoBehaviour:
     Name: 'Poolside: Laguna M.1'
   - Id: poolside/laguna-m.1:free
     Name: 'Poolside: Laguna M.1 (free)'
+  - Id: poolside/laguna-xs-2.1
+    Name: 'Poolside: Laguna XS 2.1'
+  - Id: poolside/laguna-xs-2.1:free
+    Name: 'Poolside: Laguna XS 2.1 (free)'
   - Id: poolside/laguna-xs.2
     Name: 'Poolside: Laguna XS.2'
   - Id: poolside/laguna-xs.2:free
@@ -656,10 +662,12 @@ MonoBehaviour:
     Name: 'StepFun: Step 3.5 Flash'
   - Id: stepfun/step-3.7-flash
     Name: 'StepFun: Step 3.7 Flash'
-  - Id: switchpoint/router
-    Name: Switchpoint Router
   - Id: tencent/hunyuan-a13b-instruct
     Name: 'Tencent: Hunyuan A13B Instruct'
+  - Id: tencent/hy3
+    Name: 'Tencent: Hy3'
+  - Id: tencent/hy3:free
+    Name: 'Tencent: Hy3 (free)'
   - Id: tencent/hy3-preview
     Name: 'Tencent: Hy3 preview'
   - Id: thedrummer/cydonia-24b-v4.1
@@ -718,6 +726,10 @@ MonoBehaviour:
     Name: 'xAI: Grok 4.20 Multi-Agent'
   - Id: x-ai/grok-4.3
     Name: 'xAI: Grok 4.3'
+  - Id: x-ai/grok-4.5
+    Name: 'xAI: Grok 4.5'
   - Id: x-ai/grok-build-0.1
     Name: 'xAI: Grok Build 0.1'
+  - Id: ~x-ai/grok-latest
+    Name: 'xAI: Grok Latest'
   AvailableModelsBaseUrl: https://openrouter.ai/api/v1

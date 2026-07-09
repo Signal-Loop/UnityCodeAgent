@@ -9,6 +9,67 @@ namespace UnityCodeCopilot.Service.Tests;
 public sealed class ServiceEventEnvelopeFactoryTests
 {
     [Test]
+    public void Create_ModelCallFailure_WithRejectedImageInputUsesVisionCapabilityGuidance()
+    {
+        var envelope = ServiceEventEnvelopeFactory.Create(
+            1,
+            "session-1",
+            CreateModelCallFailureEvent(
+                """{"message":"No endpoints found that support image input","code":404}""",
+                imagePartCount: 1));
+
+        Assert.That(envelope, Is.Not.Null);
+        Assert.That(envelope!.Type, Is.EqualTo(AgentEventType.Error));
+        Assert.That(envelope.Content, Does.Contain("not available for image input"));
+        Assert.That(envelope.Content, Does.Contain("vision-capable model"));
+        Assert.That(envelope.Content, Does.Not.Contain("BaseUrl"));
+    }
+
+    [Test]
+    public void Create_ModelCallFailure_WithoutImageRequestDoesNotClaimVisionFailure()
+    {
+        var envelope = ServiceEventEnvelopeFactory.Create(
+            1,
+            "session-1",
+            CreateModelCallFailureEvent(
+                """{"message":"No endpoints found that support image input","code":404}""",
+                imagePartCount: 0));
+
+        Assert.That(envelope, Is.Not.Null);
+        Assert.That(envelope!.Content, Is.Empty);
+    }
+
+    [Test]
+    public void Create_ExactScreenshotSteeringMessage_IsSuppressed()
+    {
+        var sessionEvent = new UserMessageEvent
+        {
+            Data = new UserMessageData
+            {
+                Content = "The Game View screenshot returned by the current Unity tool call is attached. Analyze it to answer the user's current request."
+            },
+            Timestamp = DateTimeOffset.UnixEpoch,
+        };
+
+        Assert.That(ServiceEventEnvelopeFactory.Create(1, "session-1", sessionEvent), Is.Null);
+    }
+
+    [Test]
+    public void Create_NormalScreenshotUserMessage_RemainsVisible()
+    {
+        var sessionEvent = new UserMessageEvent
+        {
+            Data = new UserMessageData { Content = "Describe the Game View screenshot." },
+            Timestamp = DateTimeOffset.UnixEpoch,
+        };
+
+        var envelope = ServiceEventEnvelopeFactory.Create(1, "session-1", sessionEvent);
+
+        Assert.That(envelope, Is.Not.Null);
+        Assert.That(envelope!.Content, Is.EqualTo("Describe the Game View screenshot."));
+    }
+
+    [Test]
     public void Create_ToolExecutionStartEvent_WithIntentUsesIntentText()
     {
         var envelope = ServiceEventEnvelopeFactory.Create(1, "session-1", CreateToolExecutionStartEvent(
@@ -143,6 +204,29 @@ public sealed class ServiceEventEnvelopeFactoryTests
                 StatusCode = statusCode
             },
             Timestamp = DateTimeOffset.UnixEpoch
+        };
+    }
+
+    private static ModelCallFailureEvent CreateModelCallFailureEvent(string errorMessage, long imagePartCount)
+    {
+        return new ModelCallFailureEvent
+        {
+            Data = new ModelCallFailureData
+            {
+                ErrorMessage = errorMessage,
+                StatusCode = 404,
+                Source = ModelCallFailureSource.TopLevel,
+                RequestFingerprint = new ModelCallFailureRequestFingerprint
+                {
+                    ImagePartCount = imagePartCount,
+                    ImagePartsMissingMediaType = 0,
+                    MessageCount = 5,
+                    NamelessToolCallCount = 0,
+                    ToolCallCount = 1,
+                    ToolResultMessageCount = 1,
+                },
+            },
+            Timestamp = DateTimeOffset.UnixEpoch,
         };
     }
 

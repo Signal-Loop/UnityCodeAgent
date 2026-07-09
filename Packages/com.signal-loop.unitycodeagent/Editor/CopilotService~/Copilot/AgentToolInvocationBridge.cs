@@ -125,6 +125,25 @@ public sealed class AgentToolInvocationBridge
         return pendingCall.TryComplete(result);
     }
 
+    public bool TryClaim(
+        AgentToolInvocationResultDto result,
+        out AgentToolInvocationCompletion completion)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        completion = default!;
+
+        if (string.IsNullOrWhiteSpace(result.CallId)
+            || string.IsNullOrWhiteSpace(result.SessionId)
+            || string.IsNullOrWhiteSpace(result.ToolName)
+            || !_pendingCalls.TryRemove(PendingToolCallKey.From(result), out var pendingCall))
+        {
+            return false;
+        }
+
+        completion = new AgentToolInvocationCompletion(pendingCall.TryComplete);
+        return true;
+    }
+
     private static ToolResultObject ToToolResultObject(AgentToolInvocationResultDto result)
     {
         return new ToolResultObject
@@ -173,6 +192,19 @@ public sealed class AgentToolInvocationBridge
 
         public bool TryCancel(CancellationToken cancellationToken)
             => _completion.TrySetCanceled(cancellationToken);
+    }
+
+    public sealed class AgentToolInvocationCompletion
+    {
+        private readonly Func<AgentToolInvocationResultDto, bool> _tryComplete;
+
+        internal AgentToolInvocationCompletion(Func<AgentToolInvocationResultDto, bool> tryComplete)
+        {
+            _tryComplete = tryComplete;
+        }
+
+        public bool TryComplete(AgentToolInvocationResultDto result)
+            => _tryComplete(result);
     }
 
     private readonly record struct CancellationRegistration(PendingToolCall PendingCall, CancellationToken CancellationToken);

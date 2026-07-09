@@ -312,6 +312,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
     private sealed class CopilotRuntimeSession : IAgentRuntimeSession
     {
         private const string EnqueueMode = "enqueue";
+        private const string ImmediateMode = "immediate";
         private readonly CopilotSession _session;
 
         public CopilotRuntimeSession(CopilotSession session)
@@ -332,6 +333,22 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
             {
                 Prompt = prompt,
                 Mode = EnqueueMode,
+            }, cancellationToken);
+
+        public Task SteerScreenshotAsync(string base64Data, string mimeType, CancellationToken cancellationToken)
+            => _session.SendAsync(new MessageOptions
+            {
+                Prompt = ScreenshotSteering.Prompt,
+                Mode = ImmediateMode,
+                Attachments =
+                [
+                    new AttachmentBlob
+                    {
+                        Data = base64Data,
+                        MimeType = mimeType,
+                        DisplayName = "unity-game-view.png",
+                    },
+                ],
             }, cancellationToken);
 
         public Task AbortAsync(CancellationToken cancellationToken)

@@ -157,7 +157,7 @@ public static class ServiceEndpoints
             }
         });
 
-        app.MapPost("/api/tools/results", (AgentToolInvocationResultDto request, AgentToolInvocationBridge tools, UnityCodeCopilotServiceLogger log, CopilotTelemetry telemetry) =>
+        app.MapPost("/api/tools/results", async (AgentToolInvocationResultDto request, AgentToolInvocationBridge tools, IAgentSessionService sessions, UnityCodeCopilotServiceLogger log, CopilotTelemetry telemetry, CancellationToken cancellationToken) =>
         {
             using var operation = StartHttpOperation(telemetry, TelemetryOperations.HttpToolInvocationResult, "/api/tools/results");
 
@@ -177,9 +177,43 @@ public static class ServiceEndpoints
                     ("callId", request.CallId),
                     ("isError", request.IsError));
 
-                return tools.TryComplete(request)
-                    ? Results.Accepted()
-                    : CreateJsonResult(new AgentServiceErrorResponse("The tool invocation is no longer pending.", AgentServiceErrorCodes.OperationFailed), StatusCodes.Status404NotFound);
+                if (!string.Equals(request.ToolName, "get_unity_game_view_window_screenshot", StringComparison.Ordinal)
+                    || request.IsError)
+                {
+                    return tools.TryComplete(request)
+                        ? Results.Accepted()
+                        : CreateJsonResult(new AgentServiceErrorResponse("The tool invocation is no longer pending.", AgentServiceErrorCodes.OperationFailed), StatusCodes.Status404NotFound);
+                }
+
+                if (!tools.TryClaim(request, out var completion))
+                {
+                    return CreateJsonResult(new AgentServiceErrorResponse("The tool invocation is no longer pending.", AgentServiceErrorCodes.OperationFailed), StatusCodes.Status404NotFound);
+                }
+
+                try
+                {
+                    var screenshot = GetRequiredScreenshot(request);
+                    await sessions.SteerScreenshotAsync(request.SessionId, screenshot, cancellationToken);
+                    completion.TryComplete(request with { BinaryResults = null });
+                    return Results.Accepted();
+                }
+                catch (Exception exception)
+                {
+                    operation.MarkError(exception);
+                    log.Error(nameof(ServiceEndpoints), "Game View screenshot steering failed.", exception,
+                        ("sessionId", request.SessionId),
+                        ("toolName", request.ToolName),
+                        ("callId", request.CallId));
+                    completion.TryComplete(request with
+                    {
+                        IsError = true,
+                        BinaryResults = null,
+                        Error = "Game View screenshot could not be attached for visual analysis.",
+                    });
+                    return CreateJsonResult(
+                        new AgentServiceErrorResponse("Game View screenshot could not be attached for visual analysis.", AgentServiceErrorCodes.OperationFailed),
+                        StatusCodes.Status400BadRequest);
+                }
             }
             catch (Exception exception) when (IsExpectedRequestFailure(exception))
             {
@@ -187,6 +221,18 @@ public static class ServiceEndpoints
                 return CreateErrorResult(log, nameof(ServiceEndpoints), "Unity tool result request failed.", exception, null, ("sessionId", request?.SessionId));
             }
         });
+    }
+
+    private static AgentToolBinaryResultDto GetRequiredScreenshot(AgentToolInvocationResultDto request)
+    {
+        if (request.BinaryResults is not { Count: 1 }
+            || !string.Equals(request.BinaryResults[0].Type, "image", StringComparison.Ordinal)
+            || !string.Equals(request.BinaryResults[0].MimeType, "image/png", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("A successful Game View screenshot result must contain exactly one PNG image.", nameof(request));
+        }
+
+        return request.BinaryResults[0];
     }
 
     private static void ValidateToolInvocationResult(AgentToolInvocationResultDto request)
