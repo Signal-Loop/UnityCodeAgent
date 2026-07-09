@@ -77,4 +77,5 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 ## External References
 
 - GitHub Copilot .NET SDK source: `../copilot-sdk/dotnet/` (https://github.com/github/copilot-sdk)
+- GitHub Copilot CLI source: `../copilot-cli/` (https://github.com/github/copilot-cli)
 If sdk source is not found, clone the specific version of repo to `../copilot-sdk/`. Use the exact version as in 'Packages\com.signal-loop.unitycodeagent\Editor\CopilotService~\UnityCodeCopilot.Service.csproj'.

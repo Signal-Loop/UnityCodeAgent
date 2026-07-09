@@ -796,6 +796,77 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(
                 updates.OfType<ChatShowAgentEventUpdate>().Any(update => update.AgentEvent.SessionId == Session2Id),
                 Is.False);
+            Assert.That(
+                updates.OfType<ChatSetProgressIndicatorUpdate>().Any(update => update.Command == ChatProgressIndicatorCommand.Next),
+                Is.False,
+                "Background events should not color the active chat progress indicator.");
+        }
+
+        [Test]
+        [Description("Goal: verify the progress indicator returns to default on active idle and is not recolored by later background-session events. Scope: ChatEditorWindowClient progress indicator event filtering only. Boundaries: excludes UI Toolkit rendering.")]
+        public async Task ActiveIdle_BackgroundEvent_DoesNotRecolorProgressIndicator()
+        {
+            var settings = CreateTestSettings();
+            var context = CreateTestContext(settings);
+            var harness = new BackgroundToolInvocationHarness();
+            using var client = harness.CreateClient();
+
+            var initResult = await client.InitializeAsync(context, CancellationToken.None);
+            Assert.That(initResult.Success, Is.True);
+
+            harness.Stream.Publish(new AgentServiceEventEnvelope(
+                60,
+                Session1Id,
+                DateTimeOffset.UtcNow,
+                "streaming",
+                null,
+                AgentEventType.SessionStatusChanged,
+                "streaming",
+                false));
+
+            var busyUpdates = await WaitForUpdatesAsync(
+                client,
+                context,
+                collected => collected.OfType<ChatSetProgressIndicatorUpdate>().Any(update => update.Command == ChatProgressIndicatorCommand.Next),
+                "Timed out waiting for active busy status to color the progress indicator.");
+
+            Assert.That(busyUpdates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Next));
+
+            harness.Stream.Publish(new AgentServiceEventEnvelope(
+                61,
+                Session1Id,
+                DateTimeOffset.UtcNow,
+                string.Empty,
+                null,
+                AgentEventType.SessionIdle,
+                string.Empty,
+                false));
+
+            var idleUpdates = await WaitForUpdatesAsync(
+                client,
+                context,
+                collected => collected.OfType<ChatSetProgressIndicatorUpdate>().Any(update => update.Command == ChatProgressIndicatorCommand.Default),
+                "Timed out waiting for active idle to default the progress indicator.");
+
+            Assert.That(idleUpdates.OfType<ChatSetProgressIndicatorUpdate>().Last().Command, Is.EqualTo(ChatProgressIndicatorCommand.Default));
+
+            harness.Stream.Publish(new AgentServiceEventEnvelope(
+                62,
+                Session2Id,
+                DateTimeOffset.UtcNow,
+                "background assistant response",
+                null,
+                AgentEventType.AssistantMessage,
+                string.Empty,
+                false));
+
+            await Task.Delay(EventDeliveryPollDelayMs * 2);
+            var backgroundUpdates = client.DrainUpdates(context);
+
+            Assert.That(
+                backgroundUpdates.OfType<ChatSetProgressIndicatorUpdate>().Any(update => update.Command == ChatProgressIndicatorCommand.Next),
+                Is.False,
+                "A background event after active idle should not recolor the indicator.");
         }
 
         [Test]

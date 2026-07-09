@@ -484,10 +484,6 @@ namespace SignalLoop.UnityCodeAgent.Service
                 }
 
                 AcceptServiceEvent(context, envelope);
-                if (!_isShowingSessions)
-                {
-                    EnqueueUpdate(ProgressIndicatorNext());
-                }
 
                 if (!_isShowingSessions && IsActiveSession(envelope.SessionId))
                 {
@@ -544,8 +540,11 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             if (hasBusyStateUpdate)
             {
-                EnqueueUpdate(ProgressIndicatorForBusyState(nextBusyState));
-                EnqueueUpdate(new ChatSetBusyStateUpdate(nextBusyState));
+                EnqueueBusyStateUpdate(nextBusyState);
+            }
+            else if (_activeSession.IsBusy && ShouldAdvanceProgressIndicator(envelope))
+            {
+                EnqueueUpdate(ProgressIndicatorNext());
             }
 
             EnqueueUpdate(new ChatShowAgentEventUpdate(envelope));
@@ -696,7 +695,6 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             try
             {
-                EnqueueUpdate(ProgressIndicatorNext());
                 EnqueueUpdate(new ChatSetBusyStateUpdate(true));
                 var session = await _service.OpenSessionAsync(context, _activeSession.SessionId, cancellationToken).ConfigureAwait(false);
                 var resolvedSessionId = string.IsNullOrWhiteSpace(session.SessionId) ? _activeSession.SessionId : session.SessionId;
@@ -715,8 +713,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
             finally
             {
-                EnqueueUpdate(ProgressIndicatorForBusyState(_activeSession.IsBusy));
-                EnqueueUpdate(new ChatSetBusyStateUpdate(_activeSession.IsBusy));
+                EnqueueBusyStateUpdate(_activeSession.IsBusy);
             }
         }
 
@@ -790,6 +787,22 @@ namespace SignalLoop.UnityCodeAgent.Service
             {
                 _pendingClientUpdates.Enqueue(update);
             }
+        }
+
+        private void EnqueueBusyStateUpdate(bool isBusy)
+        {
+            EnqueueUpdate(ProgressIndicatorForBusyState(isBusy));
+            EnqueueUpdate(new ChatSetBusyStateUpdate(isBusy));
+        }
+
+        private static bool ShouldAdvanceProgressIndicator(AgentServiceEventEnvelope envelope)
+        {
+            if (envelope == null || envelope.IsSubAgentEvent)
+            {
+                return false;
+            }
+
+            return envelope.Type != AgentEventType.ToolInvocationRequest;
         }
 
         private static ChatSetProgressIndicatorUpdate ProgressIndicatorDefault()
