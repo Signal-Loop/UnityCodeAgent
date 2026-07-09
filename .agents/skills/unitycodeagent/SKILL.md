@@ -1,6 +1,6 @@
 ---
 name: unitycodeagent
-description: 'Use when an agent must inspect or modify Unity Editor state with UnityCodeAgent: scene, GameObject, component, prefab, asset, ScriptableObject, or Editor automation changes; Unity console log checks; Unity EditMode or PlayMode test runs; or creating/updating favourite Editor scripts. Do not use for generic C# source editing, plain file reads/writes, or non-Unity Editor tasks.'
+description: 'Use when an agent must work in Unity, build games, inspect or modify Unity Editor state with UnityCodeAgent: scene, GameObject, component, prefab, asset, ScriptableObject, or Editor automation changes; Unity console log checks; Unity EditMode or PlayMode test runs; or creating/updating favourite Editor scripts. Do not use for generic C# source editing, plain file reads/writes, or non-Unity Editor tasks.'
 ---
 
 # Executing C# Scripts in Unity Editor

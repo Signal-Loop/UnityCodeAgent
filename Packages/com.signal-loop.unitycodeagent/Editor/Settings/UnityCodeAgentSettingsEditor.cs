@@ -217,7 +217,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         private void StartRefreshModels(UnityCodeAgentSettings settings)
         {
             serializedObject.ApplyModifiedProperties();
-            _log.Info(nameof(UnityCodeAgentSettingsEditor), "StartRefreshModels begin");
+            _log.Debug(nameof(UnityCodeAgentSettingsEditor), "StartRefreshModels begin");
 
             if (!settings.TryCreateProviderConfig(out var provider, out var validationMessage))
             {
@@ -229,7 +229,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
 
             if (_modelRefreshCoordinator?.IsRefreshInProgress == true)
             {
-                _log.Info(nameof(UnityCodeAgentSettingsEditor), "StartRefreshModels skipped because a refresh is already running");
+                _log.Debug(nameof(UnityCodeAgentSettingsEditor), "StartRefreshModels skipped because a refresh is already running");
                 return;
             }
 
@@ -249,7 +249,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
                     EditorUtility.SetDirty(settings);
                     AssetDatabase.SaveAssets();
                     serializedObject.UpdateIfRequiredOrScript();
-                    _log.Info(nameof(UnityCodeAgentSettingsEditor), $"StartRefreshModels completed count={models?.Count ?? 0}");
+                    _log.Debug(nameof(UnityCodeAgentSettingsEditor), $"StartRefreshModels completed count={models?.Count ?? 0}");
                 },
                 RunOnEditorThreadAsync,
                 Repaint,

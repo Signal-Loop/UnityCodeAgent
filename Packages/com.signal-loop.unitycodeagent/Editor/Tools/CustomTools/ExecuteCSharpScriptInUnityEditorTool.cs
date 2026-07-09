@@ -55,7 +55,7 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             }
 
 
-            _log.Debug(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool script:\n{script}");
+            _log.Info(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool script:\n{script}");
 
             ScriptExecutionService executionService = new(_context);
             ScriptExecutionService.ExecutionResult result = await executionService.ExecuteScriptAsync(script);
@@ -136,7 +136,7 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             }
             else
             {
-                _log.Debug(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool result:\n{text}");
+                _log.Info(nameof(ExecuteCSharpScriptInUnityEditorTool), $"ExecuteCSharpScriptInUnityEditorTool result:\n{text}");
             }
         }
     }
