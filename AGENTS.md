@@ -2,7 +2,7 @@
 
 ## Project
 
-UnityCodeAgent is a Unity Editor chat client backed by a local .NET 8 ASP.NET Core service that wraps the official GitHub Copilot .NET SDK.
+UnityCodeAgent is a Unity Editor chat client backed by a local .NET 8 ASP.NET Core service that wraps the official GitHub Copilot .NET SDK. Copilot SDK uses Copilot CLI.
 
 Keep Unity thin. Unity owns editor UI, bootstrap, and temporary user-side inputs. The local service owns Copilot SDK lifecycle, session orchestration, MCP integration, permissions, telemetry, and runtime metadata.
 
