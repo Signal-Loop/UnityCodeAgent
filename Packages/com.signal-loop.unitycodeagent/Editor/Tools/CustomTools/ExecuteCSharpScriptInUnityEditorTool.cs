@@ -48,7 +48,7 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
                 return CreateToolCallResult(isError: true, status: "error", resultText: null, logs: null, errors: "Script is empty or missing.");
             }
 
-            ToolsCallResult compilationBlockedResult = GetCompilationBlockedResult();
+            ToolsCallResult compilationBlockedResult = BuildCompilationBlockedResult(EditorApplication.isCompiling);
             if (compilationBlockedResult != null)
             {
                 return compilationBlockedResult;
@@ -72,19 +72,14 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             return toolCallResult;
         }
 
-        public static ToolsCallResult BuildCompilationBlockedResult(bool isCompiling, bool hasCompileErrors)
+        public static ToolsCallResult BuildCompilationBlockedResult(bool isCompiling)
         {
-            string message = EditorCompilationGate.BuildBlockedMessage("execute C# scripts", isCompiling, hasCompileErrors);
-            return CreateToolCallResult(isError: true, status: "error", resultText: null, logs: null, errors: message);
-        }
-
-        private static ToolsCallResult GetCompilationBlockedResult()
-        {
-            if (!EditorCompilationGate.TryGetBlockedMessage("execute C# scripts", out string message))
+            if (!isCompiling)
             {
                 return null;
             }
 
+            string message = EditorCompilationGate.BuildBlockedMessage("execute C# scripts", isCompiling, hasCompileErrors: false);
             return CreateToolCallResult(isError: true, status: "error", resultText: null, logs: null, errors: message);
         }
 
