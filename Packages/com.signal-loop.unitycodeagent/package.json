@@ -1,6 +1,6 @@
 {
   "name": "com.signal-loop.unitycodeagent",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "displayName": "Unity Code Agent",
   "description": "A powerful AI agent for the Unity Editor that has the ability to perform any action using Unity Editor API. This includes scripts, scenes, prefabs and assets manipulation, configuration changes, and more.",
   "unity": "6000.3",

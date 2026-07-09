@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using Newtonsoft.Json.Linq;
@@ -74,7 +74,7 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             }
 
             string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
-            text = $"**Unity Editor is in {mode}**\n\n{text}";
+            text = $"{text}\n\n**Unity Editor is in {mode}**";
 
             return ToolsCallResult.TextResult(text, result.IsError);
         }

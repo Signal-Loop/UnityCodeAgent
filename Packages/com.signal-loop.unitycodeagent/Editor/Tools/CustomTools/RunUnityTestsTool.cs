@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -226,9 +226,6 @@ Returns pass/fail status, total execution time, and detailed stack traces for an
             }
 
             StringBuilder sb = new();
-            string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
-            sb.AppendLine($"**Unity Editor is in {mode}**");
-            sb.AppendLine();
             sb.AppendLine($"Test Run Completed. Status: {result.TestStatus}");
             sb.AppendLine($"Passed: {result.PassCount}, Failed: {result.FailCount}, Inconclusive: {result.InconclusiveCount}, Skipped: {result.SkipCount}");
             sb.AppendLine($"Duration: {result.Duration}s");
@@ -238,6 +235,9 @@ Returns pass/fail status, total execution time, and detailed stack traces for an
                 sb.AppendLine("\nFailed Tests:");
                 AppendFailedTests(sb, result);
             }
+            sb.AppendLine();
+            string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
+            sb.AppendLine($"**Unity Editor is in {mode}**");
 
             return ToolsCallResult.TextResult(sb.ToString(), result.FailCount > 0);
         }

@@ -102,8 +102,6 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
                 response.AppendLine("```");
             }
 
-            string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
-            response.AppendLine($"**Unity Editor is in {mode}**");
 
             response.AppendLine("### Logs");
             response.AppendLine(string.IsNullOrWhiteSpace(logs) ? "(none)" : logs.TrimEnd());
@@ -120,6 +118,10 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
                     response.AppendLine($"- {assembly}");
                 }
             }
+
+            response.AppendLine();
+            string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
+            response.AppendLine($"**Unity Editor is in {mode}**");
 
             return ToolsCallResult.TextResult(response.ToString(), isError);
         }
