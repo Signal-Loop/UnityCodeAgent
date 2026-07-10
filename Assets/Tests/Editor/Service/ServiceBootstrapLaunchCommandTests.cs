@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using NUnit.Framework;
@@ -85,14 +85,14 @@ namespace SignalLoop.UnityCodeAgent.Service
                 projectRoot: CreateProjectRoot("Telemetry Project"),
                 serviceRoot: serviceRoot,
                 telemetryMode: UnityCodeAgentTelemetryMode.File,
-                cliTelemetryFilePath: telemetryPath,
+                telemetryFilePath: telemetryPath,
                 telemetryCaptureContent: false);
 
             var command = ServiceBootstrap.CreateLaunchCommand(context);
 
             Assert.That(command.arguments, Does.Contain("--EnableTelemetry=true"));
             Assert.That(command.arguments, Does.Contain("--TelemetryCaptureContent=False"));
-            Assert.That(command.arguments, Does.Contain($"--CliTelemetryFilePath=\"{telemetryPath}\""));
+            Assert.That(command.arguments, Does.Contain($"--TelemetryFilePath=\"{telemetryPath}\""));
             Assert.That(command.arguments, Does.Not.Contain("--OtlpEndpoint"));
         }
 
@@ -112,7 +112,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             Assert.That(command.arguments, Does.Contain("--EnableTelemetry=true"));
             Assert.That(command.arguments, Does.Contain("--OtlpEndpoint=\"http://127.0.0.1:4318\""));
             Assert.That(command.arguments, Does.Contain("--TelemetryCaptureContent=True"));
-            Assert.That(command.arguments, Does.Not.Contain("--CliTelemetryFilePath"));
+            Assert.That(command.arguments, Does.Not.Contain("--TelemetryFilePath"));
         }
 
         [Test]
@@ -171,7 +171,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             bool logToFile = false,
             UnityCodeAgentTelemetryMode telemetryMode = UnityCodeAgentTelemetryMode.None,
             string otlpEndpoint = "",
-            string cliTelemetryFilePath = "",
+            string telemetryFilePath = "",
             bool telemetryCaptureContent = false)
             => new UnityContext(
                 new UnityCodeAgentPaths(projectRoot),
@@ -187,7 +187,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 logToFile,
                 telemetryMode,
                 otlpEndpoint,
-                cliTelemetryFilePath,
+                telemetryFilePath,
                 telemetryCaptureContent,
                 Array.Empty<string>(),
                 Array.Empty<string>(),

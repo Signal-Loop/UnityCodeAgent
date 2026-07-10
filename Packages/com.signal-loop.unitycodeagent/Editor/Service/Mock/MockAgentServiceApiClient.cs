@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SignalLoop.UnityCodeAgent.Contracts;
+using SignalLoop.UnityCodeAgent.Infrastructure;
 using SignalLoop.UnityCodeAgent.Interfaces;
 using SignalLoop.UnityCodeAgent.Logging;
 
@@ -14,23 +15,31 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
         private readonly UnityCodeAgentLogger _log = new UnityCodeAgentLogger();
         private readonly MockServiceState _state;
         private readonly EndpointManifest _manifest;
+        private readonly UnityCodeAgentPaths _paths;
         private long _nextSequenceNumber = 1000;
 
         public MockAgentServiceApiClient(EndpointManifest manifest)
-            : this(manifest, MockServiceRuntime.SharedState)
+            : this(manifest, CreateManifestPaths(manifest), MockServiceRuntime.SharedState)
         {
         }
 
-        public MockAgentServiceApiClient(EndpointManifest manifest, MockServiceState state)
+        public MockAgentServiceApiClient(EndpointManifest manifest, UnityCodeAgentPaths paths)
+            : this(manifest, paths, MockServiceRuntime.SharedState)
+        {
+        }
+
+        public MockAgentServiceApiClient(EndpointManifest manifest, UnityCodeAgentPaths paths, MockServiceState state)
         {
             _manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
+            _paths = paths ?? throw new ArgumentNullException(nameof(paths));
             _state = state ?? throw new ArgumentNullException(nameof(state));
         }
 
         public Task<IReadOnlyList<SessionSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
         {
-            _log.Debug(nameof(MockAgentServiceApiClient), $"GetSessionsAsync returning {MockSessionData.SessionSummaries.Count} mock sessions.");
-            return Task.FromResult(MockSessionData.SessionSummaries);
+            var sessions = MockSessionData.GetSessionSummaries(_paths);
+            _log.Debug(nameof(MockAgentServiceApiClient), $"GetSessionsAsync returning {sessions.Count} mock sessions.");
+            return Task.FromResult(sessions);
         }
 
         public Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(ListAgentModelsRequestDto request, CancellationToken cancellationToken)
@@ -47,12 +56,12 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
         public Task<AgentSessionResponseDto> OpenSessionAsync(OpenAgentSessionRequestDto request, CancellationToken cancellationToken)
         {
             _log.Debug(nameof(MockAgentServiceApiClient), $"OpenSessionAsync sessionId={request.SessionId}");
-            var messages = MockSessionData.GetMessages(request.SessionId);
+            var messages = MockSessionData.GetMessages(_paths, request.SessionId);
 
             // Pre-register response sequences so the first prompt gets a response
             if (!_state.ResponseSequences.ContainsKey(request.SessionId))
             {
-                var sequences = MockSessionData.GetResponseSequences(request.SessionId).ToList();
+                var sequences = MockSessionData.GetResponseSequences(_paths, request.SessionId).ToList();
                 if (sequences.Count == 0)
                 {
                     sequences.Add(CreateDefaultResponseSequence(request.SessionId));
@@ -91,7 +100,7 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
             if (!_state.ResponseSequences.TryGetValue(request.SessionId, out var sequences))
             {
                 // Session was opened (not created) — register its sequences
-                var sessionSequences = MockSessionData.GetResponseSequences(request.SessionId).ToList();
+                var sessionSequences = MockSessionData.GetResponseSequences(_paths, request.SessionId).ToList();
                 if (sessionSequences.Count == 0)
                 {
                     sessionSequences.Add(CreateDefaultResponseSequence(request.SessionId));
@@ -161,6 +170,9 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
                     IsSubAgentEvent: false),
             };
         }
+
+        private static UnityCodeAgentPaths CreateManifestPaths(EndpointManifest manifest)
+            => new UnityCodeAgentPaths(string.IsNullOrWhiteSpace(manifest?.ProjectRoot) ? "C:/UnityProject" : manifest.ProjectRoot);
 
     }
 }

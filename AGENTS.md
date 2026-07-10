@@ -2,7 +2,7 @@
 
 ## Project
 
-UnityCodeAgent is a Unity Editor chat client backed by a local .NET 8 ASP.NET Core service that wraps the official GitHub Copilot .NET SDK.
+UnityCodeAgent is a Unity Editor chat client backed by a local .NET 8 ASP.NET Core service that wraps the official GitHub Copilot .NET SDK. Copilot SDK uses Copilot CLI.
 
 Keep Unity thin. Unity owns editor UI, bootstrap, and temporary user-side inputs. The local service owns Copilot SDK lifecycle, session orchestration, MCP integration, permissions, telemetry, and runtime metadata.
 
@@ -24,6 +24,7 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 - `Packages/com.signal-loop.unitycodeagent/Editor/Service`: Unity-side service bridge for manifest handling, loopback HTTP calls, SSE subscriptions, and the `AgentService` facade consumed by the UI.
 - `Packages/com.signal-loop.unitycodeagent/Editor/Contracts`: Shared DTOs and event types used by both Unity and the local service.
 - `Assets/Tests/Editor/Service`: Unity EditMode coverage for transport behavior, reconnect flows, and service restart recovery.
+- `.unityCodeAgent/client/logs/unity.log`: Path to the Unity Editor log file.
 
 ### Local Service Side
 
@@ -33,6 +34,9 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 - `Packages/com.signal-loop.unitycodeagent/Editor/CopilotService~/Infrastructure`, `Options`, `Settings`, `Telemetry`: Cross-cutting service configuration, dependency setup, logging, and operational concerns.
 - `CopilotService.Tests`: In-process endpoint and contract tests that host the real `Program` pipeline.
 - `.unityCodeAgent/service/runtime/endpoint.json`: Project-scoped runtime endpoint manifest written and consumed during local service bootstrap.
+- `Assets/Plugins/UnityCodeAgent/Editor/UnityCodeAgentSettings.asset`: Settings for running UnityCodeAgent.
+- `.unityCodeAgent/service/logs/service.log`: Path to Agent Service log file.
+- `.unityCodeAgent/service/logs/telemetry.jsonl`: Path to Telemetry log file.
 
 ## Conventions
 
@@ -54,8 +58,10 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 
 ## Verification
 
+- Always ensure that changes are discovered and reloaded by Unity Editor - check by name if new tests are discovered, check UI if changes are visible and use other methods to ensure that Unity Editor discovered changes and reloaded domain. If not, reload the domain using script. This is mandatory step and cannot be omitted.
 - For Unity/editor changes, prefer Unity EditMode tests, Unity console logs, and targeted `execute_csharp_script_in_unity_editor` checks.
 - For service changes, prefer focused `dotnet test` runs in `CopilotService.Tests`.
+- When running Codex skill validation scripts that import `yaml`, use `uv run --with pyyaml ...` instead of the ambient Python interpreter.
 - When the local `UnityCodeCopilot.Service` process may already be running, run service tests with an isolated artifact path so the build does not try to overwrite the live exe:
   `dotnet test CopilotService.Tests\UnityCodeCopilot.Service.Tests.csproj --artifacts-path .artifacts\copilot-service-tests -p:UseAppHost=false`
 - The contract-spec tests resolve `contracts/openapi/agent-service.openapi.yaml` and `contracts/asyncapi/agent-service-events.asyncapi.yaml` relative to the artifact root, so those files must also be available under `.artifacts\contracts\...` when using the artifact-path workflow.
@@ -70,5 +76,6 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 
 ## External References
 
-- GitHub Copilot .NET SDK source: `<local copilot-sdk checkout>\\dotnet\\`
-- Unity Code MCP Server source: `<local UnityCodeMcpServer checkout>\\`
+- GitHub Copilot .NET SDK source: `../copilot-sdk/dotnet/` (https://github.com/github/copilot-sdk)
+- GitHub Copilot CLI source: `../copilot-cli/` (https://github.com/github/copilot-cli)
+If sdk source is not found, clone the specific version of repo to `../copilot-sdk/`. Use the exact version as in 'Packages\com.signal-loop.unitycodeagent\Editor\CopilotService~\UnityCodeCopilot.Service.csproj'.

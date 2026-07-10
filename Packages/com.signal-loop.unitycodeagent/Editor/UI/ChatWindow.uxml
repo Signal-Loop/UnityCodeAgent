@@ -3,12 +3,17 @@
     <ui:VisualElement class="chat-window">
         <ui:ScrollView name="scroll-view" class="chat-scroll-view"/>
         <ui:ScrollView name="sessions-scroll-view" class="chat-scroll-view chat-scroll-view--hidden"/>
+        <ui:VisualElement name="progress-row" class="chat-progress-row chat-message--progress">
+            <ui:VisualElement name="progress-indicator" class="chat-progress-indicator chat-progress-indicator--default"/>
+            <ui:TextField name="progress-message" readonly="true" multiline="true" class="chat-progress-message"/>
+        </ui:VisualElement>
         <ui:VisualElement class="chat-composer">
             <ui:TextField name="user-input" multiline="true" class="chat-input"/>
             <ui:VisualElement class="chat-actions">
                 <ui:Button name="sessions-button" text="Sessions" class="chat-button"/>
                 <ui:Button name="settings-button" text="Settings" class="chat-button"/>
-                <ui:Button name="send-button" text="Send" class="chat-button chat-button--right"/>
+                <ui:Button name="stop-button" text="Stop" class="chat-button"/>
+                <ui:Button name="send-button" text="Send" class="chat-button"/>
             </ui:VisualElement>
             <ui:Label name="model-label" text="No model selected" class="chat-model-label"/>
         </ui:VisualElement>

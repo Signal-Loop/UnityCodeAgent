@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -35,7 +36,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 new ServiceBootstrap(),
                 CreateMockBootstrap(),
                 (context, manifest) => context.MockAgentService
-                    ? CreateMockApiClient(manifest)
+                    ? CreateMockApiClient(manifest, context.Paths)
                     : new HttpAgentServiceApiClient(manifest),
                 (context, manifest) => context.MockAgentService
                     ? CreateMockEventStreamClient(manifest)
@@ -64,8 +65,8 @@ namespace SignalLoop.UnityCodeAgent.Service
         private static IServiceBootstrap CreateMockBootstrap()
             => new MockServiceBootstrap();
 
-        private static IAgentServiceApiClient CreateMockApiClient(EndpointManifest manifest)
-            => new MockAgentServiceApiClient(manifest);
+        private static IAgentServiceApiClient CreateMockApiClient(EndpointManifest manifest, UnityCodeAgentPaths paths)
+            => new MockAgentServiceApiClient(manifest, paths);
 
         private static IAgentServiceEventStreamClient CreateMockEventStreamClient(EndpointManifest manifest)
             => new MockAgentServiceEventStreamClient(manifest);
@@ -98,7 +99,7 @@ namespace SignalLoop.UnityCodeAgent.Service
         private async Task<EndpointManifest> RestartCoreAsync(UnityContext context, CancellationToken cancellationToken, string operationName, bool rethrowOnFailure)
         {
             var totalStopwatch = Stopwatch.StartNew();
-            _log.Info(nameof(AgentService), $"{operationName} begin");
+            _log.Debug(nameof(AgentService), $"{operationName} begin");
             _showProgressMessage("Restarting agent service...");
 
             try
@@ -106,7 +107,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!ServiceLifecycleGate.Wait(0))
                 {
-                    _log.Info(nameof(AgentService), $"{operationName} skipped elapsedMs={totalStopwatch.ElapsedMilliseconds} reason=lifecycle_operation_in_progress");
+                    _log.Debug(nameof(AgentService), $"{operationName} skipped elapsedMs={totalStopwatch.ElapsedMilliseconds} reason=lifecycle_operation_in_progress");
                     _showProgressMessage("Agent service restart is already in progress.");
                     return null;
                 }
@@ -116,7 +117,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                     Stop(context);
                     cancellationToken.ThrowIfCancellationRequested();
                     var manifest = await StartCoreAsyncWithGateHeld(context, operationName, rethrowOnFailure: true).ConfigureAwait(false);
-                    _log.Info(nameof(AgentService), $"{operationName} completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
+                    _log.Debug(nameof(AgentService), $"{operationName} completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
                     return manifest;
                 }
                 finally
@@ -141,20 +142,20 @@ namespace SignalLoop.UnityCodeAgent.Service
         {
             var paths = context.Paths;
             var totalStopwatch = Stopwatch.StartNew();
-            _log.Info(nameof(AgentService), $"{operationName} begin");
+            _log.Debug(nameof(AgentService), $"{operationName} begin");
             _showProgressMessage("Starting agent service...");
 
             try
             {
                 var pathsStopwatch = Stopwatch.StartNew();
-                _log.Info(nameof(AgentService), $"{operationName} paths ready elapsedMs={pathsStopwatch.ElapsedMilliseconds} projectRoot={paths.ProjectRoot}");
+                _log.Debug(nameof(AgentService), $"{operationName} paths ready elapsedMs={pathsStopwatch.ElapsedMilliseconds} projectRoot={paths.ProjectRoot}");
 
                 var bootstrapStopwatch = Stopwatch.StartNew();
                 var bootstrap = context.MockAgentService ? _mockBootstrap : _bootstrap;
                 var manifest = await bootstrap.ConnectOrStartAsync(context).ConfigureAwait(false);
                 var baseUrl = $"http://127.0.0.1:{manifest.Port}";
-                _log.Info(nameof(AgentService), $"{operationName} bootstrap completed elapsedMs={bootstrapStopwatch.ElapsedMilliseconds} baseUrl={baseUrl} port={manifest.Port} serviceProcessId={manifest.ServiceProcessId}");
-                _log.Info(nameof(AgentService), $"{operationName} completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
+                _log.Debug(nameof(AgentService), $"{operationName} bootstrap completed elapsedMs={bootstrapStopwatch.ElapsedMilliseconds} baseUrl={baseUrl} port={manifest.Port} serviceProcessId={manifest.ServiceProcessId}");
+                _log.Debug(nameof(AgentService), $"{operationName} completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
                 return manifest;
             }
             catch (Exception exception)
@@ -189,7 +190,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var killStopwatch = Stopwatch.StartNew();
             var stopped = KillProcess(manifest.ServiceProcessId);
-            _log.Info(nameof(AgentService), $"Stop kill completed elapsedMs={killStopwatch.ElapsedMilliseconds} serviceProcessId={manifest.ServiceProcessId} stopped={stopped}");
+            _log.Debug(nameof(AgentService), $"Stop kill completed elapsedMs={killStopwatch.ElapsedMilliseconds} serviceProcessId={manifest.ServiceProcessId} stopped={stopped}");
             _log.Trace(nameof(AgentService), $"Stop completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
             return stopped;
         }
@@ -219,7 +220,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 StreamGenerationId = manifest?.StreamGenerationId ?? string.Empty,
             }, Formatting.Indented);
 
-            _log.Info(nameof(AgentService), $"Status result {status}");
+            _log.Debug(nameof(AgentService), $"Status result {status}");
             _log.Trace(nameof(AgentService), $"Status completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
             return status;
         }
@@ -246,9 +247,10 @@ namespace SignalLoop.UnityCodeAgent.Service
                 sessions = await _apiClientFactory(context, restartedManifest).GetSessionsAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            _log.Debug(nameof(AgentService), $"GetSessionsAsync result sessions={sessions.Count}");
+            var filteredSessions = FilterProjectSessions(context, sessions);
+            _log.Debug(nameof(AgentService), $"GetSessionsAsync result sessions={filteredSessions.Count} unfilteredSessions={sessions.Count}");
             _log.Trace(nameof(AgentService), $"GetSessionsAsync completed elapsedMs={totalStopwatch.ElapsedMilliseconds}");
-            return sessions;
+            return filteredSessions;
         }
 
         public async Task<AgentSessionResponseDto> GetCurrentSessionAsync(UnityContext context, CancellationToken cancellationToken = default)
@@ -262,7 +264,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var manifest = _manifestLoader(context);
             if (!IsUsableManifest(manifest))
             {
-                _log.Info(nameof(AgentService), "Current session requested without a usable manifest; starting service first.");
+                _log.Debug(nameof(AgentService), "Current session requested without a usable manifest; starting service first.");
                 manifest = await StartAsync(context).ConfigureAwait(false);
             }
 
@@ -318,7 +320,7 @@ namespace SignalLoop.UnityCodeAgent.Service
             var now = DateTimeOffset.UtcNow;
             var sessionId = CreateSessionId(context.Paths, now);
             var request = SessionRequestFactory.CreateNewSessionRequest(CreateSessionRequestOptions(context), sessionId);
-            _log.Info(nameof(AgentService), $"CreateSessionAsync begin sessionId={request.SessionId} model={request.Model}");
+            _log.Debug(nameof(AgentService), $"CreateSessionAsync begin sessionId={request.SessionId} model={request.Model}");
             ShowAuthenticationProgress(request.Provider);
             _showProgressMessage("Creating chat session...");
             var response = await ExecuteWithReconnectAsync(
@@ -332,7 +334,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
         public async Task<IReadOnlyList<ModelInfoDto>> GetModelsAsync(UnityContext context, ListAgentModelsRequestDto request, CancellationToken cancellationToken)
         {
-            _log.Info(nameof(AgentService), $"GetModelsAsync begin byokEnabled={request.Provider?.HasByok == true}");
+            _log.Debug(nameof(AgentService), $"GetModelsAsync begin byokEnabled={request.Provider?.HasByok == true}");
             ShowAuthenticationProgress(request.Provider);
             _showProgressMessage("Loading agent models...");
             var response = await ExecuteWithReconnectAsync(
@@ -352,7 +354,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
         public async Task SendPromptAsync(UnityContext context, SendAgentPromptRequestDto request, CancellationToken cancellationToken)
         {
-            _log.Info(nameof(AgentService), $"SendPromptAsync begin sessionId={request.SessionId} promptLength={request.Prompt.Length}");
+            _log.Debug(nameof(AgentService), $"SendPromptAsync begin sessionId={request.SessionId} promptLength={request.Prompt.Length}");
             _showProgressMessage("Sending prompt...");
             await ExecuteSessionOperationWithRecoveryAsync(
                 request.SessionId,
@@ -366,7 +368,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
         public async Task AbortPromptAsync(UnityContext context, AbortAgentPromptRequestDto request, CancellationToken cancellationToken)
         {
-            _log.Info(nameof(AgentService), $"AbortPromptAsync begin sessionId={request.SessionId}");
+            _log.Debug(nameof(AgentService), $"AbortPromptAsync begin sessionId={request.SessionId}");
             _showProgressMessage("Stopping response...");
             await ExecuteSessionOperationWithRecoveryAsync(
                 request.SessionId,
@@ -391,7 +393,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 throw new InvalidOperationException("Unity tool invocation event did not contain a valid request payload.");
             }
 
-            _log.Info(nameof(AgentService), $"ExecuteToolInvocationRequestAsync begin sessionId={request.SessionId} toolName={request.ToolName} callId={request.CallId}");
+            _log.Debug(nameof(AgentService), $"ExecuteToolInvocationRequestAsync begin sessionId={request.SessionId} toolName={request.ToolName} callId={request.CallId}");
 
             AgentToolInvocationResultDto result;
             try
@@ -414,12 +416,12 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
 
             await SendToolInvocationResultAsync(context, result, cancellationToken).ConfigureAwait(false);
-            _log.Info(nameof(AgentService), $"ExecuteToolInvocationRequestAsync completed sessionId={request.SessionId} toolName={request.ToolName} callId={request.CallId} isError={result.IsError}");
+            _log.Debug(nameof(AgentService), $"ExecuteToolInvocationRequestAsync completed sessionId={request.SessionId} toolName={request.ToolName} callId={request.CallId} isError={result.IsError}");
         }
 
         public async Task SendToolInvocationResultAsync(UnityContext context, AgentToolInvocationResultDto request, CancellationToken cancellationToken)
         {
-            _log.Info(nameof(AgentService), $"SendToolInvocationResultAsync begin sessionId={request.SessionId} toolName={request.ToolName} callId={request.CallId} isError={request.IsError}");
+            _log.Debug(nameof(AgentService), $"SendToolInvocationResultAsync begin sessionId={request.SessionId} toolName={request.ToolName} callId={request.CallId} isError={request.IsError}");
             await ExecuteSessionOperationWithRecoveryAsync(
                 request.SessionId,
                 client => client.SendToolInvocationResultAsync(request, cancellationToken),
@@ -452,7 +454,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                     var lastEventId = getLastAcceptedSequenceNumber == null
                         ? null
                         : getLastAcceptedSequenceNumber();
-                    _log.Info(nameof(AgentService), $"StreamEventsAsync begin port={manifest.Port} lastEventId={(lastEventId.HasValue ? lastEventId.Value.ToString(CultureInfo.InvariantCulture) : "null")}");
+                    _log.Debug(nameof(AgentService), $"StreamEventsAsync begin port={manifest.Port} lastEventId={(lastEventId.HasValue ? lastEventId.Value.ToString(CultureInfo.InvariantCulture) : "null")}");
                     await _eventStreamClientFactory(context, manifest).StreamEventsAsync(envelope =>
                     {
                         if (envelope != null && !string.IsNullOrWhiteSpace(envelope.SessionId))
@@ -496,14 +498,14 @@ namespace SignalLoop.UnityCodeAgent.Service
         {
             _log.Debug(nameof(AgentService), $"OpenCurrentSessionAsync using manifest port={manifest.Port} serviceProcessId={manifest.ServiceProcessId}");
             var client = _apiClientFactory(context, manifest);
-            var sessions = await client.GetSessionsAsync(cancellationToken).ConfigureAwait(false);
+            var sessions = FilterProjectSessions(context, await client.GetSessionsAsync(cancellationToken).ConfigureAwait(false));
             if (sessions.Count == 0)
             {
                 throw new InvalidOperationException("Copilot service snapshot did not contain any sessions.");
             }
 
             var currentSession = sessions[0];
-            _log.Info(nameof(AgentService), $"Selected current session sessionId={currentSession.SessionId} sessionSummary={currentSession.Summary}");
+            _log.Debug(nameof(AgentService), $"Selected current session sessionId={currentSession.SessionId} sessionSummary={currentSession.Summary}");
             return await OpenSessionAsync(client, SessionRequestFactory.CreateOpenSessionRequest(requestOptions, currentSession.SessionId), cancellationToken, totalStopwatch).ConfigureAwait(false);
         }
 
@@ -546,7 +548,7 @@ namespace SignalLoop.UnityCodeAgent.Service
                 return manifest;
             }
 
-            _log.Info(nameof(AgentService), "Service request received without a usable manifest; starting service first.");
+            _log.Debug(nameof(AgentService), "Service request received without a usable manifest; starting service first.");
             return await StartAsync(context).ConfigureAwait(false);
         }
 
@@ -627,12 +629,16 @@ namespace SignalLoop.UnityCodeAgent.Service
             }
         }
 
-        private static string CreateSessionId(UnityCodeAgentPaths paths, DateTimeOffset timestampUtc)
+        private static IReadOnlyList<SessionSummaryDto> FilterProjectSessions(UnityContext context, IReadOnlyList<SessionSummaryDto> sessions)
         {
-            return string.IsNullOrWhiteSpace(paths.SafeProjectRoot)
-                ? $"UnityCodeAgentSession-{timestampUtc:yyyyMMddHHmmssfff}"
-                : $"UnityCodeAgentSession-{timestampUtc:yyyyMMddHHmmssfff}-{paths.SafeProjectRoot}";
+            return sessions
+                .Where(session => UnityCodeAgentSessionIds.TryParse(session.SessionId, out var parsed)
+                    && string.Equals(parsed.SanitizedProjectRoot, context.Paths.SanitizedProjectRoot, StringComparison.Ordinal))
+                .ToArray();
         }
+
+        private static string CreateSessionId(UnityCodeAgentPaths paths, DateTimeOffset timestampUtc)
+            => UnityCodeAgentSessionIds.Create(paths, timestampUtc);
 
         private static EndpointManifest LoadManifest(UnityContext context)
         {

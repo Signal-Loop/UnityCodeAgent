@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -48,12 +48,7 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
         public string Name => "play_unity_game";
 
         public string Description =>
-            @"Advances the Unity game state and simulates player input for a specified duration.
-    WHAT IT DOES: Temporarily unpauses the game (timeScale=1), triggers specified Input System actions (press/hold), records console logs, and safely pauses the game (timeScale=0) upon completion.
-    WHEN TO USE: Use to test gameplay mechanics over time and simulate character movement or UI interactions.
-    WHEN NOT TO USE: Do NOT use to edit scripts, modify scene architecture, or inspect static scene data.
-    PREREQUISITES: Unity MUST already be in Play Mode (use the 'enter_play_mode' tool first).
-    SIDE EFFECTS: Alters Time.timeScale, overrides active Input System states, and consumes in-game time.";
+            "Runs a Unity game that is already in Play Mode for a specified duration, optionally simulating Input System actions and returning logs captured during play. Use this to test gameplay over time, simulate movement or UI input, and observe runtime behavior.";
 
         public JToken InputSchema => JsonHelper.ParseElement(@"
             {
@@ -204,21 +199,21 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
         private void ApplyRuntimeInputOverrides(RuntimeInputSettingsSnapshot snapshot)
         {
             Application.runInBackground = true;
-            _log.Info(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Set Application.runInBackground=true to allow input without focus. Previous value was {snapshot.ApplicationRunInBackground}.");
+            _log.Debug(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Set Application.runInBackground=true to allow input without focus. Previous value was {snapshot.ApplicationRunInBackground}.");
             InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
-            _log.Info(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Set InputSystem.settings.backgroundBehavior=IgnoreFocus to bypass focus gating. Previous value was {snapshot.BackgroundBehavior}.");
+            _log.Debug(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Set InputSystem.settings.backgroundBehavior=IgnoreFocus to bypass focus gating. Previous value was {snapshot.BackgroundBehavior}.");
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-            _log.Info(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Set InputSystem.settings.editorInputBehaviorInPlayMode=AllDeviceInputAlwaysGoesToGameView to ensure input is sent to game view. Previous value was {snapshot.EditorInputBehavior}.");
+            _log.Debug(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Set InputSystem.settings.editorInputBehaviorInPlayMode=AllDeviceInputAlwaysGoesToGameView to ensure input is sent to game view. Previous value was {snapshot.EditorInputBehavior}.");
         }
 
         private void RestoreRuntimeInputOverrides(RuntimeInputSettingsSnapshot snapshot)
         {
             Application.runInBackground = snapshot.ApplicationRunInBackground;
-            _log.Info(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Restored Application.runInBackground to {snapshot.ApplicationRunInBackground}.");
+            _log.Debug(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Restored Application.runInBackground to {snapshot.ApplicationRunInBackground}.");
             InputSystem.settings.backgroundBehavior = snapshot.BackgroundBehavior;
-            _log.Info(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Restored InputSystem.settings.backgroundBehavior to {snapshot.BackgroundBehavior}.");
+            _log.Debug(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Restored InputSystem.settings.backgroundBehavior to {snapshot.BackgroundBehavior}.");
             InputSystem.settings.editorInputBehaviorInPlayMode = snapshot.EditorInputBehavior;
-            _log.Info(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Restored InputSystem.settings.editorInputBehaviorInPlayMode to {snapshot.EditorInputBehavior}.");
+            _log.Debug(nameof(PlayUnityGameTool), $"#PlayUnityGameTool: Restored InputSystem.settings.editorInputBehaviorInPlayMode to {snapshot.EditorInputBehavior}.");
         }
 
         private void ReenableDevicesDisabledByFocusLoss()

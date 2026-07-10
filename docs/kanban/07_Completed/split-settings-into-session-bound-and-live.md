@@ -22,7 +22,7 @@
     - The current inspector groups settings by domain labels (`Service`, `Logging`, `Debug`, `Tools`, `Telemetry`, `BYOK`, `Skills`, `Model`), not by apply lifetime.
 
     Classification:
-    - Service-restart-bound settings: `UseDynamicServicePort`, `ServicePort`, `ServiceOrphanTimeoutSeconds`, service-side `MinLogLevel`/`LogToFile`, `TelemetryMode`, `OtlpEndpoint`, `CliTelemetryFilePath`, `TelemetryCaptureContent`, and `MockAgentService`.
+    - Service-restart-bound settings: `UseDynamicServicePort`, `ServicePort`, `ServiceOrphanTimeoutSeconds`, service-side `MinLogLevel`/`LogToFile`, `TelemetryMode`, `OtlpEndpoint`, `TelemetryFilePath`, `TelemetryCaptureContent`, and `MockAgentService`.
     - Internally session-reopen-bound settings: `Model`, `ByokBaseUrl`, `ByokApiKey`, enabled skill directories, disabled skills, working directory/project root, and the tool definitions sent in open/create requests.
     - User-facing live settings: internally session-reopen-bound settings plus `ShowEventsSourceInChat`, `ShowAllEventsInChat`, Unity-side logger level/file logging, input actions asset path, additional tool assemblies for future tool calls, and skill installer target/path behavior.
     - UI rule from product feedback: settings applied by automatically reopening/restarting the active session should be shown in the live-applied section because the user experiences them as live changes and does not need to reason about session lifecycle.

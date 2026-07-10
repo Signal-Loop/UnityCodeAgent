@@ -18,7 +18,7 @@ public sealed class ServiceOptionsValidator : IValidateOptions<ServiceOptions>
             failures.Add("Configuration value 'ProjectRoot' must point to an existing directory.");
         }
 
-        if (options.UnityProcessId <= 0)
+        if (!options.NoUnity && options.UnityProcessId <= 0)
         {
             failures.Add("Configuration value 'UnityProcessId' must be greater than 0.");
         }

@@ -1,0 +1,10 @@
+[
+  {
+    "name": "add assembly",
+    "script": "SignalLoop.UnityCodeAgent.Settings.UnityCodeAgentSettings.Instance.AddToolAssembly(\"UnityEngine.Physics2DModule\");"
+  },
+  {
+    "name": "Reload",
+    "script": "using UnityEditor.Compilation;\n\nvar assetPath = \"{asset_path}\";\nUnityEditor.AssetDatabase.ImportAsset(assetPath, UnityEditor.ImportAssetOptions.ForceUpdate);\nUnityEditor.AssetDatabase.Refresh(UnityEditor.ImportAssetOptions.ForceSynchronousImport);\nUnityEditor.Compilation.CompilationPipeline.RequestScriptCompilation();\nUnityEngine.Debug.Log($\"Requested asset import, script compilation, and domain reload for {{assetPath}}\");"
+  }
+]

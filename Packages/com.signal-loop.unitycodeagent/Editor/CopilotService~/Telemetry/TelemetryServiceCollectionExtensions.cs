@@ -18,7 +18,7 @@ internal static class TelemetryServiceCollectionExtensions
         }
 
         services.AddSingleton<CopilotTelemetry>();
-        services.AddSingleton<CliTelemetryConfigFactory>();
+        services.AddSingleton<TelemetryConfigFactory>();
         return services;
     }
 

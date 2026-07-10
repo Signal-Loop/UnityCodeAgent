@@ -1,0 +1,31 @@
+[project]
+name = "unitycodeagent-evals"
+version = "0.1.0"
+description = "DeepEval harness for UnityCodeAgent service and skill scenarios."
+requires-python = ">=3.12"
+dependencies = [
+    "deepeval>=4.0.0",
+    "httpx>=0.27.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".artifacts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

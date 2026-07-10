@@ -2,8 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -46,7 +46,7 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             var response = await service.CreateSessionAsync(harness.Context, CancellationToken.None);
 
-            Assert.That(new UnityCodeAgentPaths(projectRoot).SafeProjectRoot, Is.EqualTo("C__work_My_Project"));
+            Assert.That(new UnityCodeAgentPaths(projectRoot).SanitizedProjectRoot, Is.EqualTo("C__work_My_Project"));
             Assert.That(response.SessionId, Does.Match(@"^UnityCodeAgentSession-[0-9]{17}-C__work_My_Project$"));
             Assert.That(response.SessionId, Does.Not.Contain(projectRoot));
         }

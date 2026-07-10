@@ -26,5 +26,7 @@ public interface IAgentRuntimeSession : IAsyncDisposable
 
     Task SendPromptAsync(string prompt, CancellationToken cancellationToken);
 
+    Task SteerScreenshotAsync(string base64Data, string mimeType, CancellationToken cancellationToken);
+
     Task AbortAsync(CancellationToken cancellationToken);
 }

@@ -87,10 +87,15 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             }
 
             var mimeType = string.IsNullOrWhiteSpace(scaledResult.MimeType) ? DefaultMimeType : scaledResult.MimeType;
-
             _log.Debug(nameof(GetUnityGameViewWindowScreenshotTool), $"Successfully captured and scaled screenshot. Data length: {scaledResult.Base64Data.Length}, MimeType: {mimeType}");
 
-            return ToolsCallResult.ImageResult(scaledResult.Base64Data, mimeType);
+            return new ToolsCallResult
+            {
+                Content = new List<ContentItem>
+                {
+                    ContentItem.ImageContent(scaledResult.Base64Data, mimeType)
+                }
+            };
         }
 
         private async Task<CaptureResult> CaptureGameViewScreenshotAsync()
@@ -171,6 +176,11 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
         }
 
         private static void TryDeleteTempFile(string path)
+        {
+            TryDeleteFile(path);
+        }
+
+        private static void TryDeleteFile(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
             {

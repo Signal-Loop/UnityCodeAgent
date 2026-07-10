@@ -114,10 +114,23 @@ public sealed class CopilotSessionManager : IAsyncDisposable, IAgentSessionServi
 
             var sessionMessages = await session.GetEventsAsync(cancellationToken);
             var messages = new List<AgentServiceEventEnvelope>(sessionMessages.Count);
+            var suppressNextProviderNotFound = false;
 
             for (var index = 0; index < sessionMessages.Count; index++)
             {
                 var sessionMessage = sessionMessages[index];
+                if (sessionMessage is ModelCallFailureEvent { Data: { } failureData }
+                    && ServiceEventEnvelopeFactory.IsUnsupportedImageInputFailure(failureData))
+                {
+                    suppressNextProviderNotFound = true;
+                }
+                else if (suppressNextProviderNotFound
+                    && sessionMessage is SessionErrorEvent { Data.StatusCode: 404 })
+                {
+                    suppressNextProviderNotFound = false;
+                    continue;
+                }
+
                 var serviceEvent = ServiceEventEnvelopeFactory.Create(index, sessionId, sessionMessage);
                 if (serviceEvent is not null)
                 {
@@ -195,6 +208,42 @@ public sealed class CopilotSessionManager : IAsyncDisposable, IAgentSessionServi
                 throw CopilotAuthFailureClassifier.CreateAuthenticationException(attached.Provider, exception);
             }
         });
+
+    public async Task SteerScreenshotAsync(
+        string sessionId,
+        AgentToolBinaryResultDto screenshot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(screenshot);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(screenshot.Data))
+        {
+            throw new ArgumentException("Screenshot data must not be empty.", nameof(screenshot));
+        }
+
+        if (!string.Equals(screenshot.MimeType, "image/png", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Screenshot MIME type must be image/png.", nameof(screenshot));
+        }
+
+        try
+        {
+            _ = Convert.FromBase64String(screenshot.Data);
+        }
+        catch (FormatException exception)
+        {
+            throw new ArgumentException("Screenshot data must be valid base64.", nameof(screenshot), exception);
+        }
+
+        var attached = GetRequiredSession(sessionId);
+        _log.Info(nameof(CopilotSessionManager), "Steering Game View screenshot into active session.",
+            ("sessionId", sessionId),
+            ("mimeType", screenshot.MimeType),
+            ("encodedLength", screenshot.Data.Length));
+
+        await attached.Session.SteerScreenshotAsync(screenshot.Data, screenshot.MimeType, cancellationToken);
+    }
 
     public Task AbortAsync(AbortAgentPromptRequestDto request, CancellationToken cancellationToken)
         => _telemetry.ExecuteAsync(TelemetryOperations.ServiceSessionAbort, async operation =>
@@ -298,11 +347,29 @@ public sealed class CopilotSessionManager : IAsyncDisposable, IAgentSessionServi
         _log.Debug(nameof(CopilotSessionManager), "Received runtime event.",
             ("sessionId", attached.SessionId),
             ("eventType", sessionEvent.Type),
-            ("content", sessionEvent.ToJson()));
+            ("content", IsScreenshotSteeringEvent(sessionEvent)
+                ? "[internal screenshot steering event redacted]"
+                : sessionEvent.ToJson()));
 
         _telemetry.RecordRuntimeEvent(sessionEvent.Type);
 
-        _broker.Publish(attached.SessionId, sessionEvent);
+        var suppressProviderNotFound = attached.SuppressNextProviderNotFound
+            && sessionEvent is SessionErrorEvent { Data.StatusCode: 404 };
+
+        if (sessionEvent is ModelCallFailureEvent { Data: { } failureData }
+            && ServiceEventEnvelopeFactory.IsUnsupportedImageInputFailure(failureData))
+        {
+            attached.SuppressNextProviderNotFound = true;
+        }
+        else if (sessionEvent is SessionErrorEvent)
+        {
+            attached.SuppressNextProviderNotFound = false;
+        }
+
+        if (!suppressProviderNotFound)
+        {
+            _broker.Publish(attached.SessionId, sessionEvent);
+        }
 
         if (sessionEvent is SessionErrorEvent)
         {
@@ -323,6 +390,9 @@ public sealed class CopilotSessionManager : IAsyncDisposable, IAgentSessionServi
             UpdateSessionStatus(attached, ReadyStatus);
         }
     }
+
+    private static bool IsScreenshotSteeringEvent(SessionEvent sessionEvent)
+        => sessionEvent is UserMessageEvent { Data.Content: ScreenshotSteering.Prompt };
 
     private AttachedSession GetRequiredSession(string sessionId)
     {
@@ -400,5 +470,7 @@ public sealed class CopilotSessionManager : IAsyncDisposable, IAgentSessionServi
         public IAgentRuntimeSession Session { get; }
 
         public IDisposable Subscription { get; set; }
+
+        public bool SuppressNextProviderNotFound { get; set; }
     }
 }

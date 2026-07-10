@@ -1,9 +1,10 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using SignalLoop.UnityCodeAgent.Settings;
 using SignalLoop.UnityCodeAgent.Tools.Interfaces;
 using SignalLoop.UnityCodeAgent.Tools.Protocol;
+using UnityEditor;
 using UnityEngine;
 
 namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
@@ -56,6 +57,10 @@ namespace SignalLoop.UnityCodeAgent.Tools.CustomTools
             sb.AppendLine("### Script Execution Assemblies");
             AppendAssemblies(sb, "Default Assemblies", UnityCodeAgentSettings.DefaultToolAssemblyNames);
             AppendAssemblies(sb, "Additional Assemblies", context?.AdditionalToolAssemblyNames);
+            sb.AppendLine();
+            string mode = EditorApplication.isPlaying ? "Play Mode" : "Edit Mode";
+            sb.AppendLine($"**Unity Editor is in {mode}**");
+
             return ToolsCallResult.TextResult(sb.ToString());
         }
 

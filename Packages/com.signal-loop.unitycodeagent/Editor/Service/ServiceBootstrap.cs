@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -45,23 +45,23 @@ namespace SignalLoop.UnityCodeAgent.Service
             var existingManifest = await TryLoadExistingManifestAsync(paths, unityProcessId).ConfigureAwait(false);
             if (existingManifest != null)
             {
-                _log.Info(nameof(ServiceBootstrap), $"Reusing manifest port={existingManifest.Port} serviceProcessId={existingManifest.ServiceProcessId} elapsedMs={stopwatch.ElapsedMilliseconds}.");
+                _log.Debug(nameof(ServiceBootstrap), $"Reusing manifest port={existingManifest.Port} serviceProcessId={existingManifest.ServiceProcessId} elapsedMs={stopwatch.ElapsedMilliseconds}.");
                 return existingManifest;
             }
 
             TryDeleteManifest(paths.EndpointManifestPath);
 
             var launchCommand = CreateLaunchCommand(context);
-            _log.Info(nameof(ServiceBootstrap), $"Starting service '{launchCommand.executablePath} {launchCommand.arguments}' workingDirectory={launchCommand.workingDirectory}.");
+            _log.Debug(nameof(ServiceBootstrap), $"Starting service '{launchCommand.executablePath} {launchCommand.arguments}' workingDirectory={launchCommand.workingDirectory}.");
             var startedProcess = StartProcess(launchCommand.executablePath, launchCommand.arguments, launchCommand.workingDirectory);
-            _log.Info(nameof(ServiceBootstrap), $"Service start requested pid={startedProcess.ProcessId} elapsedMs={stopwatch.ElapsedMilliseconds} timeoutMs={(int)DefaultManifestTimeout.TotalMilliseconds}.");
+            _log.Debug(nameof(ServiceBootstrap), $"Service start requested pid={startedProcess.ProcessId} elapsedMs={stopwatch.ElapsedMilliseconds} timeoutMs={(int)DefaultManifestTimeout.TotalMilliseconds}.");
             var manifest = await WaitForManifestAsync(
                 paths.EndpointManifestPath,
                 paths.ProjectRoot,
                 DefaultManifestTimeout,
                 (publishedManifest, root) => IsPublishedManifest(publishedManifest, root, unityProcessId),
                 startedProcess).ConfigureAwait(false);
-            _log.Info(nameof(ServiceBootstrap), $"Manifest ready port={manifest.Port} serviceProcessId={manifest.ServiceProcessId} elapsedMs={stopwatch.ElapsedMilliseconds}.");
+            _log.Debug(nameof(ServiceBootstrap), $"Manifest ready port={manifest.Port} serviceProcessId={manifest.ServiceProcessId} elapsedMs={stopwatch.ElapsedMilliseconds}.");
             return manifest;
         }
 
@@ -95,14 +95,14 @@ namespace SignalLoop.UnityCodeAgent.Service
 
             if (!IsProcessAlive(reusableManifest.ServiceProcessId))
             {
-                _log.Info(nameof(ServiceBootstrap), $"Manifest rejected: serviceProcessId={reusableManifest.ServiceProcessId} is not alive.");
+                _log.Debug(nameof(ServiceBootstrap), $"Manifest rejected: serviceProcessId={reusableManifest.ServiceProcessId} is not alive.");
                 return false;
             }
 
             var healthy = await IsEndpointHealthyAsync(reusableManifest).ConfigureAwait(false);
             if (!healthy)
             {
-                _log.Info(nameof(ServiceBootstrap), $"Manifest rejected: endpoint health probe failed for port={reusableManifest.Port}.");
+                _log.Debug(nameof(ServiceBootstrap), $"Manifest rejected: endpoint health probe failed for port={reusableManifest.Port}.");
             }
 
             return healthy;
@@ -221,9 +221,9 @@ namespace SignalLoop.UnityCodeAgent.Service
                         " --EnableTelemetry=true" +
                         $" --TelemetryCaptureContent={context.TelemetryCaptureContent}";
 
-                    if (!string.IsNullOrWhiteSpace(context.CliTelemetryFilePath))
+                    if (!string.IsNullOrWhiteSpace(context.TelemetryFilePath))
                     {
-                        fileArguments += $" --CliTelemetryFilePath=\"{context.CliTelemetryFilePath.Trim()}\"";
+                        fileArguments += $" --TelemetryFilePath=\"{context.TelemetryFilePath.Trim()}\"";
                     }
 
                     return fileArguments;

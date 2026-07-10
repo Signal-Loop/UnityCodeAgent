@@ -1,18 +1,15 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Threading;
-using SignalLoop.UnityCodeAgent.Contracts;
 using SignalLoop.UnityCodeAgent.Infrastructure;
-using SignalLoop.UnityCodeAgent.Logging;
-using SignalLoop.UnityCodeAgent.Settings;
 using UnityEngine.UIElements;
 
 namespace SignalLoop.UnityCodeAgent.UI
 {
     internal sealed class ChatProgressMessages
     {
-        private static readonly TimeSpan InitialDelay = TimeSpan.FromSeconds(1.5);
-        private static readonly TimeSpan RefreshDelay = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan InitialDelay = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan RefreshDelay = TimeSpan.FromSeconds(10);
 
         private static readonly string[] Messages =
         {
@@ -68,26 +65,16 @@ namespace SignalLoop.UnityCodeAgent.UI
             "Building the ROM...",
         };
 
-        private readonly ScrollView _scrollView;
-        private readonly ChatTranscriptScroller _transcriptScroller;
-        private readonly UnityCodeAgentLogger _log;
-        private readonly string _templateAssetPath;
+        private readonly TextField _progressField;
         private readonly ConcurrentQueue<string> _pendingMessages = new ConcurrentQueue<string>();
         private readonly Random _random = new Random();
         private DateTimeOffset _lastVisibleMessageUtc;
         private DateTimeOffset _lastProgressUtc;
         private int _messageEpoch;
 
-        public ChatProgressMessages(
-            ScrollView scrollView,
-            ChatTranscriptScroller transcriptScroller,
-            UnityCodeAgentLogger log,
-            string templateAssetPath)
+        public ChatProgressMessages(TextField progressField)
         {
-            _scrollView = scrollView;
-            _transcriptScroller = transcriptScroller;
-            _log = log;
-            _templateAssetPath = templateAssetPath;
+            _progressField = progressField;
         }
 
         public Action<string> ShowProgressMessage => EnqueueFromAnyThread;
@@ -102,7 +89,7 @@ namespace SignalLoop.UnityCodeAgent.UI
         {
             if (!isBusy)
             {
-                RemoveTrailingProgress();
+                ClearProgress();
                 InvalidatePendingProgress();
                 Reset();
                 return;
@@ -114,11 +101,10 @@ namespace SignalLoop.UnityCodeAgent.UI
             }
         }
 
-        public void PrepareForVisibleMessage()
+        public void NotifyVisibleTranscriptMessage()
         {
             InvalidatePendingProgress();
             _lastVisibleMessageUtc = DateTimeOffset.UtcNow;
-            RemoveTrailingProgress();
         }
 
         public void DrainPending()
@@ -164,6 +150,12 @@ namespace SignalLoop.UnityCodeAgent.UI
             }
         }
 
+        public void ClearProgressAndPending()
+        {
+            InvalidatePendingProgress();
+            ClearProgress();
+        }
+
         private void EnqueueFromAnyThread(string content)
         {
             if (string.IsNullOrWhiteSpace(content))
@@ -193,62 +185,24 @@ namespace SignalLoop.UnityCodeAgent.UI
             ClearPending();
         }
 
-        private bool ShowProgress(string content)
+        private void ShowProgress(string content)
         {
-            if (string.IsNullOrWhiteSpace(content) || _scrollView == null)
+            if (string.IsNullOrWhiteSpace(content) || _progressField == null)
             {
-                return false;
+                return;
             }
 
-            var existingProgress = GetLastProgressField();
-            if (existingProgress != null)
-            {
-                existingProgress.value = content;
-                _transcriptScroller?.RequestScrollToBottom(existingProgress);
-                return true;
-            }
-
-            var template = UnityCodeAgentPackagePaths.LoadAsset<VisualTreeAsset>(_templateAssetPath);
-            if (template == null)
-            {
-                _log.Warning(nameof(ChatProgressMessages), $"No visual tree asset found for progress message path={UnityCodeAgentPackagePaths.ResolveAssetPath(_templateAssetPath)}");
-                return false;
-            }
-
-            var container = new VisualElement();
-            template.CloneTree(container);
-            container.SetEnabled(false);
-
-            var messageField = container.Q<TextField>("chat-message");
-            if (messageField == null)
-            {
-                return false;
-            }
-
-            messageField.value = content;
-            _scrollView.Add(messageField);
-            _transcriptScroller?.RequestScrollToBottom(messageField);
-            return true;
+            _progressField.value = content;
         }
 
-        public void RemoveTrailingProgress()
+        public void ClearProgress()
         {
-            var progressField = GetLastProgressField();
-            if (progressField != null)
+            if (_progressField == null)
             {
-                progressField.RemoveFromHierarchy();
-            }
-        }
-
-        private TextField GetLastProgressField()
-        {
-            if (_scrollView == null || _scrollView.contentContainer.childCount == 0)
-            {
-                return null;
+                return;
             }
 
-            var last = _scrollView.contentContainer[_scrollView.contentContainer.childCount - 1] as TextField;
-            return last != null && last.ClassListContains("chat-message--progress") ? last : null;
+            _progressField.value = string.Empty;
         }
     }
 }

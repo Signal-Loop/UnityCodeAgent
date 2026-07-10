@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using SignalLoop.UnityCodeAgent.Contracts;
 using SignalLoop.UnityCodeAgent.Infrastructure;
@@ -22,7 +22,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
             bool logToFile,
             UnityCodeAgentTelemetryMode telemetryMode,
             string otlpEndpoint,
-            string cliTelemetryFilePath,
+            string telemetryFilePath,
             bool telemetryCaptureContent,
             IReadOnlyList<string> skillDirectories,
             IReadOnlyList<string> disabledSkills,
@@ -45,7 +45,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
             LogToFile = logToFile;
             TelemetryMode = telemetryMode;
             OtlpEndpoint = otlpEndpoint ?? string.Empty;
-            CliTelemetryFilePath = cliTelemetryFilePath ?? string.Empty;
+            TelemetryFilePath = telemetryFilePath ?? string.Empty;
             TelemetryCaptureContent = telemetryCaptureContent;
             SkillDirectories = Copy(skillDirectories);
             DisabledSkills = Copy(disabledSkills);
@@ -70,7 +70,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         public bool LogToFile { get; }
         public UnityCodeAgentTelemetryMode TelemetryMode { get; }
         public string OtlpEndpoint { get; }
-        public string CliTelemetryFilePath { get; }
+        public string TelemetryFilePath { get; }
         public bool TelemetryCaptureContent { get; }
         public IReadOnlyList<string> SkillDirectories { get; }
         public IReadOnlyList<string> DisabledSkills { get; }

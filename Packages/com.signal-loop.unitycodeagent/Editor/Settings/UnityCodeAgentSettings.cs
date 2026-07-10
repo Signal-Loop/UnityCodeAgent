@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using SignalLoop.UnityCodeAgent.Contracts;
@@ -35,6 +35,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         private const string ByokApiKeyEditorPrefsKey = "SignalLoop.UnityCodeAgent.Settings.ByokApiKey";
 
         private static UnityCodeAgentSettings _instance;
+        private readonly UnityCodeAgentLogger _logger = new UnityCodeAgentLogger();
 
         [Tooltip("When enabled, the service binds to an ephemeral loopback port and publishes the chosen port through the endpoint manifest.")]
         public bool UseDynamicServicePort = true;
@@ -43,7 +44,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         public int ServicePort = 5007;
 
         [Tooltip("Timeout in seconds before the service shuts down after the Unity parent process disappears.")]
-        public int ServiceOrphanTimeoutSeconds = 90;
+        public int ServiceOrphanTimeoutSeconds = 20;
 
         [Tooltip("Minimum log level. Messages below this level are suppressed.")]
         public UnityCodeAgentLogger.LogLevel MinLogLevel = UnityCodeAgentLogger.LogLevel.Info;
@@ -64,7 +65,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
         public string OtlpEndpoint = string.Empty;
 
         [Tooltip("SDK/CLI telemetry file path used when Telemetry Mode is set to File. Leave empty to use .unityCodeAgent/service/logs/telemetry.jsonl.")]
-        public string CliTelemetryFilePath = string.Empty;
+        public string TelemetryFilePath = string.Empty;
 
         [Tooltip("When enabled, telemetry exporters may include prompt and response content. Ignored when Telemetry Mode is None.")]
         public bool TelemetryCaptureContent = true;
@@ -78,7 +79,8 @@ namespace SignalLoop.UnityCodeAgent.Settings
             "UnityEngine.CoreModule",
             "UnityEditor.CoreModule",
             "Assembly-CSharp",
-            "Assembly-CSharp-Editor"
+            "Assembly-CSharp-Editor",
+            "UnityCodeAgent.Editor",
         };
 
         [Tooltip("Additional assemblies to load for C# script execution beyond the default assemblies.")]
@@ -291,27 +293,47 @@ namespace SignalLoop.UnityCodeAgent.Settings
             return allAssemblies.ToArray();
         }
 
-        public bool AddToolAssembly(string assemblyName)
+        public string ValidateAssemblyName(string assemblyName)
         {
             if (string.IsNullOrWhiteSpace(assemblyName))
             {
+                return "Assembly name is required.";
+            }
+
+            assemblyName = assemblyName.Trim();
+
+            if (Array.IndexOf(DefaultToolAssemblyNames, assemblyName) >= 0)
+            {
+                return $"Assembly '{assemblyName}' is already included in the default tool assemblies.";
+            }
+
+            if (!IsAssemblyLoaded(assemblyName))
+            {
+                throw new ArgumentException($"Assembly '{assemblyName}' is not loaded in the current AppDomain.");
+            }
+
+            if (AdditionalToolAssemblyNames != null && AdditionalToolAssemblyNames.Contains(assemblyName))
+            {
+                return $"Assembly '{assemblyName}' is already added.";
+            }
+
+            return string.Empty;
+        }
+
+        public bool AddToolAssembly(string assemblyName)
+        {
+            var validationMessage = ValidateAssemblyName(assemblyName);
+            if (!string.IsNullOrEmpty(validationMessage))
+            {
+                _logger.Warning(nameof(UnityCodeAgentSettings), validationMessage);
                 return false;
             }
 
             assemblyName = assemblyName.Trim();
-            if (Array.IndexOf(DefaultToolAssemblyNames, assemblyName) >= 0)
-            {
-                return false;
-            }
-
             AdditionalToolAssemblyNames ??= new List<string>();
-            if (AdditionalToolAssemblyNames.Contains(assemblyName))
-            {
-                return false;
-            }
-
             AdditionalToolAssemblyNames.Add(assemblyName);
             EditorUtility.SetDirty(this);
+
             return true;
         }
 
@@ -515,7 +537,7 @@ namespace SignalLoop.UnityCodeAgent.Settings
                 settings.LogToFile,
                 settings.TelemetryMode,
                 settings.OtlpEndpoint,
-                settings.CliTelemetryFilePath,
+                settings.TelemetryFilePath,
                 settings.TelemetryCaptureContent,
                 settings.GetEnabledSkillDirectories(),
                 settings.GetDisabledSkillNames(),
@@ -570,6 +592,27 @@ namespace SignalLoop.UnityCodeAgent.Settings
 
         private static string NormalizePath(string path)
             => (path ?? string.Empty).Replace("\\", "/");
+
+        private static bool IsAssemblyLoaded(string assemblyName)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyName))
+            {
+                return false;
+            }
+
+            var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (var index = 0; index < loadedAssemblies.Length; index++)
+            {
+                var loadedAssembly = loadedAssemblies[index];
+                var loadedAssemblyName = loadedAssembly?.GetName().Name;
+                if (string.Equals(loadedAssemblyName, assemblyName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private ModelInfoDto FindAvailableModel(ModelInfoDto model)
         {

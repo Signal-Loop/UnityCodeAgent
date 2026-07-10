@@ -96,6 +96,27 @@ Research before planning. Inspect the relevant code, tests, contracts, docs, and
 
 If the current task title or filename is vague, stale, or misleading, rename the task during planning so both the file-local `#` heading and the markdown filename better reflect the real scope. Keep the new name concise and specific, and avoid renaming when the current name is already clear enough.
 
+Every implementation plan must include a concise C4 change diagram suite in PlantUML:
+
+- Required: System Context, Container, Component, and Code views.
+- Use PlantUML C4 macros such as `C4Context`, `C4Container`, and `C4Component` where possible.
+- Use a simple Mermaid class diagram for the Code view.
+- Use Mermaid sequence or activity diagrams for dynamic behavior when the task changes a runtime flow, adds a feature, or alters an existing flow.
+- Label meaningful new, changed, removed, and unchanged elements.
+- Keep diagrams task-scoped; write "No change" for required views with no impact.
+
+Example:
+
+```plantuml
+@startuml
+!include <C4/C4_Context>
+title System Context - sample
+Person(user, "User", "Uses the feature")
+System(system, "Target System", "The thing being changed")
+Rel(user, system, "Uses")
+@enduml
+```
+
 Then update the selected task with a concise implementation plan:
 
 ```markdown
@@ -105,11 +126,23 @@ Then update the selected task with a concise implementation plan:
     - [ ] Implement step...
     - [ ] Verify behavior...
 
+Original task:
+~~~
+Create...
+~~~
+
 Research:
 - Finding...
 
 Plan:
 - Step...
+
+C4 Change Diagrams:
+- System Context:
+- Container:
+- Component:
+- Code:
+- Flowchart/Sequence:
 
 Verification:
 - Test or check...

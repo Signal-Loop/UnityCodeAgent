@@ -15,7 +15,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
 
     private readonly ByokOpenAiProvider _byokOpenAiProvider;
     private readonly UnityCodeCopilotServiceLogger _log;
-    private readonly CliTelemetryConfigFactory _cliTelemetryConfigFactory;
+    private readonly TelemetryConfigFactory _cliTelemetryConfigFactory;
     private readonly McpConfigLoader _mcpConfigLoader;
     private readonly ProjectPaths _paths;
     private readonly CopilotTelemetry _telemetry;
@@ -28,7 +28,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
         McpConfigLoader mcpConfigLoader,
         AgentToolInvocationBridge toolInvocationBridge,
         ProjectPaths paths,
-        CliTelemetryConfigFactory cliTelemetryConfigFactory,
+        TelemetryConfigFactory cliTelemetryConfigFactory,
         CopilotTelemetry telemetry)
     {
         _byokOpenAiProvider = byokOpenAiProvider;
@@ -79,10 +79,11 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
     {
         if (_client != null)
         {
+            var client = _client;
             await _telemetry.ExecuteAsync(TelemetryOperations.SdkClientStop, async _ =>
             {
                 _log.Info(nameof(CopilotClientHost), "Stopping Copilot client host.");
-                await _client.DisposeAsync();
+                await client.StopAsync();
                 _client = null;
                 _log.Info(nameof(CopilotClientHost), "Copilot client host stopped.");
             });
@@ -253,8 +254,21 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
         if (_client != null)
         {
             _log.Info(nameof(CopilotClientHost), "Disposing Copilot client host.");
-            await _client.DisposeAsync();
-            _client = null;
+            try
+            {
+                await StopAsync(CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                var client = _client;
+                _log.Error(nameof(CopilotClientHost), "Graceful Copilot client host disposal failed; force-disposing client.", exception);
+                if (client != null)
+                {
+                    await client.DisposeAsync();
+                    _client = null;
+                    _log.Info(nameof(CopilotClientHost), "Copilot client host force-disposed.");
+                }
+            }
         }
     }
 
@@ -298,6 +312,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
     private sealed class CopilotRuntimeSession : IAgentRuntimeSession
     {
         private const string EnqueueMode = "enqueue";
+        private const string ImmediateMode = "immediate";
         private readonly CopilotSession _session;
 
         public CopilotRuntimeSession(CopilotSession session)
@@ -318,6 +333,22 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
             {
                 Prompt = prompt,
                 Mode = EnqueueMode,
+            }, cancellationToken);
+
+        public Task SteerScreenshotAsync(string base64Data, string mimeType, CancellationToken cancellationToken)
+            => _session.SendAsync(new MessageOptions
+            {
+                Prompt = ScreenshotSteering.Prompt,
+                Mode = ImmediateMode,
+                Attachments =
+                [
+                    new AttachmentBlob
+                    {
+                        Data = base64Data,
+                        MimeType = mimeType,
+                        DisplayName = "unity-game-view.png",
+                    },
+                ],
             }, cancellationToken);
 
         public Task AbortAsync(CancellationToken cancellationToken)

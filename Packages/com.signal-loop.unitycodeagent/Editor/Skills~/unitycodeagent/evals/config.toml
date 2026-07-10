@@ -1,0 +1,35 @@
+[service]
+request_timeout_seconds = 30
+scenario_timeout_seconds = 180
+idle_timeout_seconds = 45
+preflight_timeout_seconds = 30
+
+[provider]
+model = "xiaomi/mimo-v2.5"
+type = "openai"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+wire_api = "chat"
+
+[telemetry]
+otlp_endpoint = "http://127.0.0.1:4318"
+
+[session]
+working_directory = "."
+skill_directories = [".agents/skills"]
+disabled_skills = []
+
+[[tools.definitions]]
+Name = "execute_csharp_script_in_unity_editor"
+Description = "Executes a C# script in the Unity Editor context using Roslyn. Use this for scene, GameObject, component, prefab, and asset automation. Provide raw C# top-level statements in the script argument."
+InputSchemaJson = '{"type":"object","properties":{"script":{"type":"string","description":"Raw C# script to execute. Do not wrap in markdown."}},"required":["script"]}'
+
+[[tools.definitions]]
+Name = "read_unity_console_logs"
+Description = "Reads recent Unity Editor Console logs. Use max_entries to keep the result small."
+InputSchemaJson = '{"type":"object","properties":{"max_entries":{"type":"integer","minimum":1,"maximum":1000}}}'
+
+[[tools.definitions]]
+Name = "run_unity_tests"
+Description = "Runs Unity tests through the TestRunnerApi. Prefer focused test names and EditMode for editor logic."
+InputSchemaJson = '{"type":"object","properties":{"tests":{"type":"array","items":{"type":"string"}},"test_mode":{"type":"string","enum":["EditMode","PlayMode","Both"]}}}'

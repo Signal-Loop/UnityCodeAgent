@@ -11,6 +11,7 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
     {
         private readonly UnityCodeAgentLogger _log = new UnityCodeAgentLogger();
         private long _nextSequenceNumber = 1;
+        private int _abortPromptCount;
 
         public MockServiceState()
         {
@@ -47,6 +48,9 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
         public long CurrentSequenceNumber
             => Interlocked.Read(ref _nextSequenceNumber);
 
+        public int AbortPromptCount
+            => Volatile.Read(ref _abortPromptCount);
+
         public void AdvanceSequenceNumberTo(long sequenceNumber)
         {
             long current;
@@ -76,6 +80,7 @@ namespace SignalLoop.UnityCodeAgent.Service.Mock
 
         public void CancelActivePrompt()
         {
+            Interlocked.Increment(ref _abortPromptCount);
             var cts = ActivePromptCts;
             if (cts != null && !cts.IsCancellationRequested)
             {

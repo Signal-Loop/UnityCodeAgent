@@ -8,9 +8,9 @@
 
 .chat-scroll-view {
   background-color: var(--unity-colors-window-background);
-  padding: 10px;
+  padding: 2px;
   flex-grow: 1;
-  padding: 2px
+  padding-bottom: 0px
 }
 
 .chat-scroll-view--hidden {
@@ -61,7 +61,12 @@
   margin-left: 0;
 }
 
-.chat-button--right {
+.chat-button#send-button,
+.chat-button#settings-button {
+  margin-left: 5px;
+}
+
+.chat-button#stop-button {
   margin-left: auto;
 }
 
@@ -135,7 +140,88 @@
   -unity-font-style: italic;
 }
 
+.chat-progress-row {
+  flex-direction: row;
+  align-items: center;
+  flex-grow: 0;
+  flex-shrink: 0;
+  margin-top: 0;
+  margin-right: 0px;
+  margin-bottom: 0;
+  margin-left: 10px;
+}
+
+.chat-progress-indicator {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  max-width: 8px;
+  max-height: 8px;
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+
+.chat-progress-indicator--default {
+  background-color: #777777;
+}
+
+.chat-progress-indicator--spectrum-0 {
+  background-color: #000000;
+}
+
+.chat-progress-indicator--spectrum-1 {
+  background-color: #0000FF;
+}
+
+.chat-progress-indicator--spectrum-2 {
+  background-color: #FF0000;
+}
+
+.chat-progress-indicator--spectrum-3 {
+  background-color: #FF00FF;
+}
+
+.chat-progress-indicator--spectrum-4 {
+  background-color: #00FF00;
+}
+
+.chat-progress-indicator--spectrum-5 {
+  background-color: #00FFFF;
+}
+
+.chat-progress-indicator--spectrum-6 {
+  background-color: #FFFF00;
+}
+
+.chat-progress-indicator--spectrum-7 {
+  background-color: #FFFFFF;
+}
+
+.chat-progress-message {
+  flex-grow: 0;
+  flex-shrink: 0;
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 0;
+  margin-left: 0;
+  padding-top: 0;
+  padding-right: 2px;
+  padding-bottom: 0;
+  padding-left: 2px;
+  color: var(--unity-colors-default-text);
+  white-space: normal;
+}
+
 #chat-message .unity-base-text-field__input {
+  border-left-width: 0;
+  border-right-width: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  background-color: rgba(0, 0, 0, 0);
+}
+
+#progress-message .unity-base-text-field__input {
   border-left-width: 0;
   border-right-width: 0;
   border-top-width: 0;

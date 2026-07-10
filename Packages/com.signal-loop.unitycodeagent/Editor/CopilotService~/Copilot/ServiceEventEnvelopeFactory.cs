@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using GitHub.Copilot;
 using SignalLoop.UnityCodeAgent.Contracts;
 using UnityCodeCopilot.Service.Api;
@@ -15,6 +15,10 @@ namespace UnityCodeCopilot.Service.Copilot
                 throw new ArgumentException("Session ID must be provided.", nameof(sessionId));
             }
             if (sessionEvent.Type.Equals("assistant.streaming_delta", StringComparison.Ordinal))
+            {
+                return null;
+            }
+            if (sessionEvent is UserMessageEvent { Data.Content: ScreenshotSteering.Prompt })
             {
                 return null;
             }
@@ -66,6 +70,11 @@ namespace UnityCodeCopilot.Service.Copilot
             var normalizedEventType = eventType!;
 
             if (normalizedEventType.Contains("error", StringComparison.Ordinal))
+            {
+                return AgentEventType.Error;
+            }
+
+            if (normalizedEventType.Equals("model.call_failure", StringComparison.Ordinal))
             {
                 return AgentEventType.Error;
             }
@@ -155,8 +164,16 @@ namespace UnityCodeCopilot.Service.Copilot
                 SessionErrorEvent { Data: { } data } => (
                     BuildSessionErrorSummary(data),
                     null),
+                ModelCallFailureEvent { Data: { } data } when IsUnsupportedImageInputFailure(data) => (
+                    AgentServiceAuthMessages.ForUnsupportedImageInput(),
+                    null),
                 _ => (GetContentOrFallback(null), null),
             };
+
+        internal static bool IsUnsupportedImageInputFailure(ModelCallFailureData data)
+            => data.RequestFingerprint?.ImagePartCount > 0
+                && !string.IsNullOrWhiteSpace(data.ErrorMessage)
+                && data.ErrorMessage.Contains("image", StringComparison.OrdinalIgnoreCase);
 
 
 
