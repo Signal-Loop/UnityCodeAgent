@@ -7,6 +7,9 @@ Unity Code Agent is an AI agent for the Unity Editor. With access to Unity Edito
 
 Unity Code Agent is based on Github Copilot SDK and supports both BYOK (Bring Your Own Key) OpenAI-compatible endpoints and GitHub Copilot subscription (free and paid).
 
+![Create Snake game example](images/UnityCodeAgents_snake_Intro.gif)<br/>
+*Unity Code Agent building Snake game, more in [Example](#example).*
+
 ## Table of Contents
 
 - [Features](#features)
@@ -26,6 +29,7 @@ Unity Code Agent is based on Github Copilot SDK and supports both BYOK (Bring Yo
 - [Adding MCP servers](#adding-mcp-servers)
 - [Script execution context](#script-execution-context)
 - [Security considerations](#security-considerations)
+- [Example](#example)
 - [License](#license)
 
 ## Features
@@ -272,6 +276,31 @@ To add additional assemblies use settings 'Additional Assemblies' section.
 ## Security considerations
 
 Unity Code Agent executes LLM-generated C# code, including reflection code, with the same privileges as the Unity Editor process. Use it at your own risk. To the fullest extent permitted by law, Signal Loop disclaims liability for any changes, damage, or data loss resulting from its use. You are responsible for securing your environment.
+
+## Example
+
+The following task includes:
+
+- Installing the required assets.
+- Creating an image asset.
+- Creating input actions.
+- Implementing game logic based on a specification.
+- Testing created features in play mode.
+
+```
+Create a Snake game.
+Target resolution: 1920x1080. Grid size: 32x32. The game should fill the screen.
+Install TextMesh Pro assets.
+Create a 32x32 white PNG sprite and use it for the visuals.
+The snake should be light gray with a white head. Food should appear in a random bright color.
+Use the new Input System for controls. Create new Input Actions for Up, Down, Left, and Right, bind them to the keyboard arrow keys, and use them.
+Show the score at the top center. Show a Game Over screen with the score and allow the player to restart by pressing any key.
+The snake should speed up by a configurable percentage after eating food. The amount of length added after eating food should also be configurable.
+Follow Unity best practices for game development. Use the MVC pattern.
+Verify the work using 'play unity game'. Verification should cover movement, eating food, snake growth, collision detection, scoring, and game-over conditions.
+```
+
+The quality of the selected model, the clarity of the request, and the complexity of the project affect the quality of the result. The agent has all the tools required to investigate and verify tasks through successful completion.
 
 ## License
 
