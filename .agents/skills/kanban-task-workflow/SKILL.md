@@ -1,51 +1,43 @@
 ---
 name: kanban-task-workflow
-description: Use this skill whenever the user asks to work from kanban task files, proceed with kanban tasks, pick the next task, plan tasks, move task files through `01_Backlog`/`02_Started`/`03_Planning`/`04_Ready`/`05_ToDo`/`06_InProgress`/`07_Completed` folders, or run an automated task workflow based on folder status. This skill reads markdown task files, researches and plans tasks before implementation, coordinates user review by folder moves, updates task notes, modifies code only for the selected task, and verifies the result.
+description: Use this skill whenever the user asks to work from kanban task files, proceed with kanban tasks, pick the next task, plan tasks, or update a task's kanban status or priority order. This skill reads markdown task files whose `status` and `order` properties define the board, researches and plans tasks before implementation, coordinates user review through status changes, updates task notes, modifies code only for the selected task, and verifies the result.
 ---
 
 # Kanban Task Workflow
 
-Use this skill to turn markdown task files into the active work queue for the repository. The task folder tree is the coordination surface: read it before acting, select one task at a time, move only the selected task file when changing status, update only the selected task file unless the user explicitly asks for broader edits, and keep code changes aligned with the task's current folder.
+Use this skill to turn markdown task files into the active work queue for the repository. The task files are the coordination surface: read them before acting, select one task at a time, update the selected task's properties when its status changes, update only the selected task file unless the user explicitly asks for broader edits, and keep code changes aligned with the task's current status.
 
 ## Board Model
 
-The default task root is `docs/kanban/`. Status is represented by the folder containing a task file. Folder names use a zero-padded order prefix plus a PascalCase status name. Do not use a text `status` property inside task files as the source of truth.
+The default task root is `docs/kanban/`. Each task is a markdown file under that root. Status is represented by the task file's `status` property, never by its containing folder. `order` is an integer priority and sort key: lower numbers are selected first within the same status.
 
-Create these folders if they are missing:
+Keep task files directly under `docs/kanban/` unless the repository has a documented non-status organization such as epics or teams. Such folders may organize files, but must not define task state. Preserve existing non-status folders and infer their purpose from local documentation before acting.
 
-- `docs/kanban/01_Backlog/`
-- `docs/kanban/02_Started/`
-- `docs/kanban/03_Planning/`
-- `docs/kanban/04_Ready/`
-- `docs/kanban/05_ToDo/`
-- `docs/kanban/06_InProgress/`
-- `docs/kanban/07_Completed/`
+Supported statuses and ownership:
 
-Known folders:
+- `Backlog`: user-managed. Ideas or tasks not ready for processing. Do not modify, plan, or implement unless the user explicitly names one or asks to pull from Backlog.
+- `Started`: handoff to the agent for planning. When selecting one, set `status: Planning` before researching or planning.
+- `Planning`: agent-managed. Requires codebase research and an implementation plan before user review.
+- `Ready`: user-managed review state. Do not implement unless the user explicitly requests it. User acceptance changes it to `ToDo`.
+- `ToDo`: handoff to the agent for implementation. Set it to `InProgress` before editing code.
+- `InProgress`: agent-managed. Work is underway; update its notes and checklist as work advances.
+- `Completed`: agent-managed. Finished and verified. Do not reopen unless the user asks or current verification proves it incomplete.
 
-- `01_Backlog`: user-managed. Stores ideas or tasks that are not ready for processing. Do not modify, plan, or implement these unless the user explicitly names one or asks to pull from `01_Backlog`. The user manually moves tasks from `01_Backlog` to `02_Started` to state that they are ready for planning.
-- `02_Started`: handoff folder, agent-managed. Tasks here are ready to plan. When selecting a task from `02_Started`, move the selected task file to `03_Planning` before researching and planning it.
-- `03_Planning`: agent-managed. Tasks need codebase research and an implementation plan before they can be reviewed by the user.
-- `04_Ready`: user-managed. The user reviews the plan. If accepted, the user moves the task to `05_ToDo`. If the plan needs more work, the user adds comments and moves the task back to `03_Planning`.
-- `05_ToDo`: handoff folder, agent-managed. Tasks are ready to implement. Move the selected task to `06_InProgress` before editing code.
-- `06_InProgress`: agent-managed. Tasks are actively being implemented. Update implementation notes and checklist state in the task file.
-- `07_Completed`: agent-managed. Completed tasks. Do not reopen unless the user asks or current verification proves the task is incomplete.
-
-If the task root uses extra folders, preserve them and infer their meaning from local text before acting. Prefer the known folders above for automated workflow decisions.
+Use these exact values and capitalization. Do not represent workflow state with a folder, a separate shared board, or a `blocked` status. Record blockers in task notes while leaving the task in its current status unless the repository defines a separate status for blocked work.
 
 ## Task Files
 
-Each task lives in its own markdown file so separate agents can work concurrently without rewriting a shared board file. Keep filenames stable unless renaming is necessary for clarity. Use a short, filesystem-safe filename that matches the task title when creating a new task.
+Each task lives in its own markdown file so separate agents can work concurrently without rewriting a shared board file. Keep filenames stable unless renaming is necessary for clarity. Use a short, filesystem-safe filename that matches the task title when creating a task.
 
-Each task file should contain a task title, useful properties, a checklist, and notes. Use only properties that help the workflow. Do not invent due dates, labels, or estimates when the task does not need them.
-
-Preferred shape:
+Each task file must contain an H1 title, `status`, `order`, a useful goal when it is `Ready` or later, a checklist, and notes. Keep properties in the bullet-property style used by the existing board:
 
 ```markdown
 # Task title
 
+- status: Backlog
+- order: 100
 - goal: Implement the scoped change, verified by focused tests, while preserving existing public behavior outside the task boundary.
-- updated: 2026-06-29
+- updated: 2026-07-17
 - steps:
     - [ ] Research current behavior
     - [ ] Implement scoped change
@@ -56,52 +48,56 @@ Longer task description, user comments, research notes, plan, verification notes
 
 Supported fields:
 
-- `goal`: compact completion contract for the task. Write it as an auditable outcome with verification and constraints, following the Codex Goals pattern: desired end state, evidence that proves it, important boundaries, and what to report if blocked.
+- `status`: required; one of the statuses in Board Model. It is the sole source of truth for workflow state.
+- `order`: required positive integer. Lower values take priority. Create and renumber with wide gaps—normally `100`, `200`, `300`—so a task can be inserted between two others without renumbering the whole board (for example, use `150` between `100` and `200`).
+- `goal`: compact, auditable completion contract: desired end state, verification evidence, important boundaries, and what to report if blocked.
 - `reason`: short blocker or decision note when useful.
 - `updated`: ISO date, when useful for longer tasks.
 - `steps`: checklist of concrete work items.
 
-Do not use `status` or review/acceptance properties. Folder location is the task status, and the user's movement of task files between `04_Ready` and `05_ToDo` is the readiness signal. Do not use a `blocked` property as a workflow status; record blockers in a notes section and leave the task in its current folder until it can move forward.
+Do not invent due dates, labels, estimates, or review/acceptance properties. Add or update only fields that help selection, planning, implementation, verification, or future continuation.
 
-Do not add every possible property. Add or update only the fields that help selection, planning, implementation, verification, or future continuation.
+## Validation Script
 
-Use `goal` to keep the task objective visible across turns. A good goal is narrow enough to verify but broad enough to let the agent choose the next useful action. Avoid vague goals like "improve this"; prefer statements that name what should be true, how to check it, what must not regress, and what to report if the evidence cannot be gathered.
+Run `uv run .agents/skills/kanban-task-workflow/scripts/validate_tasks.py` after changing task files, and before handing off a kanban workflow change. Pass an alternative task root as its optional argument when needed. Run `uv run .agents/skills/kanban-task-workflow/scripts/test_validate_tasks.py` after changing the validator; it creates isolated temporary task files and exercises every validation rule.
+
+The standalone script validates every task file recursively under the task root (excluding `readme.md`). It reports concise, file-specific remediation errors for a missing H1 task title or missing/invalid required properties: `status` and positive-integer `order`; `goal` is also required for `Ready`, `ToDo`, `InProgress`, and `Completed` tasks. Keep this script concise and update it whenever this skill changes its task-file schema or validation rules.
 
 ## Task Selection
 
 When the user says to proceed, continue, work the board, pick the next task, or similar:
 
 1. Read `AGENTS.md` or the user-provided repository instructions when available.
-2. Read the task root and create known status folders if they are missing.
-3. Select exactly one task:
-   - First choose the first task in `05_ToDo`.
-   - Otherwise choose the first task in `02_Started` and move it to `03_Planning` before planning.
-   - Do not choose from `06_InProgress` without explicit user direction because it may already be implemented in another session.
-   - Do not choose from `03_Planning` without explicit user direction because it may already be planned in another session.
-   - Do not choose from `04_Ready` without explicit user direction because it is waiting for user review.
-   - Do not choose from `01_Backlog` without explicit user direction because it is user-managed and not ready for processing.
-4. If no actionable task exists, report the folder state and the smallest next decision needed from the user.
+2. Read task files under the task root, excluding non-task markdown such as `README.md` when local documentation identifies it as such. Do not create status folders.
+3. Parse each task's `status` and `order`. Treat a missing or invalid property as a recordkeeping issue: do not select it automatically; report it and ask the user or repair it only when the intended value is unambiguous.
+   Run the validation script first when task-file integrity is uncertain or after a bulk task update.
+4. Select exactly one task, sorted by ascending `order` within each eligible status:
+   - First choose the lowest-order `ToDo` task.
+   - Otherwise choose the lowest-order `Started` task and set `status: Planning` before planning.
+   - Do not choose `InProgress`, `Planning`, `Ready`, `Backlog`, or `Completed` without explicit user direction.
+5. Break equal `order` values by deterministic relative file path, and note the duplicate order so it can be resolved later.
+6. If no actionable task exists, report the status counts, any invalid records, and the smallest next decision needed from the user.
 
-Keep task order stable within folders. When several task files are present in one folder, choose by deterministic filename order unless local notes clearly indicate a higher priority.
+When the user asks to reprioritize work, change only the relevant tasks' `order` values. Prefer inserting a value in an existing gap; renumber the smallest affected set only when no suitable integer remains. Preserve wide gaps after renumbering.
 
 ## Workflow By Status
 
-### 02_Started
+### Started
 
-Tasks in `02_Started` are a handoff from the user to the agent for planning. When selecting a task from this folder, move it to `03_Planning` before editing the task file or researching the implementation. Do not leave a picked-up planning task in `02_Started`.
+Tasks in `Started` are ready for planning. When selecting one, set `status: Planning` before editing other task content or researching implementation. Do not leave a picked-up planning task in `Started`.
 
-### 03_Planning
+### Planning
 
-Research before planning. Inspect the relevant code, tests, contracts, docs, and recent task notes. Use `rg`/`rg --files` first for local search. Browse the internet only when the task depends on current external facts or the user asks for external research. Plan should be robust, reliable, cover edge cases, and be strictly scoped to the task. Tests should be focused, fast, and verify the task's goal without assuming unrelated behavior.
+Research before planning. Inspect relevant code, tests, contracts, docs, and recent task notes. Use `rg`/`rg --files` first for local search. Browse the internet only when the task depends on current external facts or the user asks for external research. Keep the plan reliable, edge-case aware, and strictly scoped. Tests should be focused, fast, and verify the goal without assuming unrelated behavior.
 
-If the current task title or filename is vague, stale, or misleading, rename the task during planning so both the file-local `#` heading and the markdown filename better reflect the real scope. Keep the new name concise and specific, and avoid renaming when the current name is already clear enough.
+If the current task title or filename is vague, stale, or misleading, rename it during planning so its `#` heading and filename reflect the real scope. Keep the new name concise and specific; do not rename a clear task merely for cosmetic consistency.
 
 Every implementation plan must include a concise C4 change diagram suite in PlantUML:
 
 - Required: System Context, Container, Component, and Code views.
 - Use PlantUML C4 macros such as `C4Context`, `C4Container`, and `C4Component` where possible.
 - Use a simple Mermaid class diagram for the Code view.
-- Use Mermaid sequence or activity diagrams for dynamic behavior when the task changes a runtime flow, adds a feature, or alters an existing flow.
+- Use Mermaid sequence or activity diagrams when the task changes a runtime flow, adds a feature, or alters an existing flow.
 - Label meaningful new, changed, removed, and unchanged elements.
 - Keep diagrams task-scoped; write "No change" for required views with no impact.
 
@@ -120,8 +116,10 @@ Rel(user, system, "Uses")
 Then update the selected task with a concise implementation plan:
 
 ```markdown
+- status: Planning
+- order: 100
 - goal: Produce a researched implementation plan, verified against the relevant code and tests, with blockers and user review needs called out explicitly.
-- updated: 2026-06-29
+- updated: 2026-07-17
 - steps:
     - [ ] Implement step...
     - [ ] Verify behavior...
@@ -148,55 +146,53 @@ Verification:
 - Test or check...
 ```
 
-When planning is complete, move the task file to `04_Ready`. The user reviews tasks in `04_Ready`; if planning is not acceptable, the user may add comments and move the task back to `03_Planning`. When a task returns to `03_Planning`, read the new comments, analyze what changed, and revise the plan before moving it back to `04_Ready`.
+When planning is complete, set `status: Ready`. The user reviews `Ready` tasks; if the plan is not acceptable, they may add comments and set the task back to `Planning`. When it returns to `Planning`, read the new comments, revise the plan, and set it to `Ready` again.
 
-### 04_Ready
+### Ready
 
-Do not implement tasks from `04_Ready`. This folder is user-managed review state. The user signals acceptance by moving the task file to `05_ToDo`. If the user explicitly asks you to revise a `04_Ready` task, treat it as a planning task, update the plan, and leave or move it according to the user's instruction.
+Do not implement `Ready` tasks. It is a user-managed review state. The user signals acceptance by setting `status: ToDo`. If the user explicitly asks to revise a Ready task, treat it as Planning, update the plan, and set the status according to their instruction.
 
-### 05_ToDo
+### ToDo
 
-Tasks in `05_ToDo` are a handoff from the user to the agent for implementation. Before editing code, confirm the task has enough plan detail to implement. The task being in `05_ToDo` is the user acceptance signal; do not ask for a separate review property.
+Tasks in `ToDo` are accepted for implementation. Before editing code, confirm that the task has enough plan detail to implement. Its `ToDo` status is the acceptance signal; do not require a separate review property.
 
-If plan detail is missing or inconsistent, move the task back to `03_Planning` with a short note explaining what needs more research. If the plan is ready, move the task to `06_InProgress` and implement the scoped plan.
+If plan detail is missing or inconsistent, set `status: Planning` and add a short note explaining what needs more research. If ready, set `status: InProgress` and implement the scoped plan.
 
-### 06_InProgress
+### InProgress
 
 Implement the task end to end. Keep edits narrow and aligned with repository conventions. Update contracts, DTOs, tests, docs, or examples only when the task requires those surfaces to stay consistent.
 
-Implementation should follow KISS, YAGNI and SOLID principles, avoid unnecessary refactors, introduce abstractions only if they provide clear value, and preserve existing behavior outside the task scope. If a blocker arises, update the task with a concrete blocker note, what was tried, and the decision or external input needed to continue. Keep the task in `06_InProgress` unless the user has a separate folder for blocked work.
+Follow KISS, YAGNI, and SOLID. Avoid unnecessary refactors, add abstractions only when they provide clear value, and preserve behavior outside the task scope. If blocked, update the task with what was tried and the decision or input needed; keep it `InProgress` unless the repository defines a separate approved status.
 
 After implementation:
 
 1. Run the most focused verification available.
-2. If verification passes, update steps statuses, add a short completion note with the checks run, and move the task file to `07_Completed`.
-3. If verification fails or a blocker remains, keep the task in `06_InProgress` with a concrete reason and next action.
+2. If it passes, update checklist state, add a short completion note with the checks run, and set `status: Completed`.
+3. If it fails or a blocker remains, keep `status: InProgress` with a concrete reason and next action.
 
-### 07_Completed
+### Completed
 
-Completed tasks should include enough notes for future readers to understand what changed and how it was verified. Do not edit completed task files except to add missing verification context, correct an obvious recordkeeping mistake, or respond to a user request.
+Completed tasks should include enough notes to explain what changed and how it was verified. Do not edit them except to add missing verification context, correct an obvious recordkeeping mistake, or respond to a user request.
 
-## Editing Task Files
+## Editing and Migration
 
 When modifying task files:
 
-- Preserve unrelated task text, ordering, spelling, and formatting.
-- Move only the selected task file between status folders.
-- Keep `01_Backlog` and `04_Ready` user-managed unless explicitly requested.
-- Add short notes that help the next agent continue: research findings, plan, verification, blockers, and completion summary.
-- Avoid rewriting task files for cosmetic cleanup.
-- Prefer file moves over copying task text. A task should exist in exactly one status folder at a time.
+- Preserve unrelated text, ordering, spelling, and formatting.
+- Change `status` instead of moving a file to signal a status transition.
+- Preserve `order` unless the user asks to reprioritize or a new task needs placement.
+- Keep `Backlog` and `Ready` user-managed unless explicitly requested.
+- Add short continuity notes: research findings, plan, verification, blockers, and completion summary.
+- Avoid cosmetic rewrites and do not duplicate a task in another folder or shared board.
 
-If legacy `docs/kanban.md` or `docs/kanban-done.md` files exist and the user asks to migrate them:
+If legacy status folders such as `01_Backlog` through `07_Completed` exist and the user asks to migrate them:
 
-- Create the known status folders under `docs/kanban/` if they do not exist.
-- Convert each legacy task card into its own markdown task file.
-- Use the legacy `status` property when present to choose the destination folder; otherwise infer status from the source board section or legacy file purpose.
-- Convert each task heading to a file-local `# Task title` heading.
-- Preserve the rest of the task text, including goal, updated, steps, research, plan, verification, completion notes, and user comments.
-- After migration, do not keep task state duplicated in shared-board markdown files. Replace legacy files with a brief note pointing to `docs/kanban/`, or remove them if the user asked for full replacement.
+1. Move each task file to the task root (or a documented non-status grouping folder).
+2. Set `status` from the legacy folder mapping: `01_Backlog` → `Backlog`, `02_Started` → `Started`, `03_Planning` → `Planning`, `04_Ready` → `Ready`, `05_ToDo` → `ToDo`, `06_InProgress` → `InProgress`, `07_Completed` → `Completed`.
+3. Add `order` when missing, assigning `100`, `200`, `300`, and so on within each status in deterministic filename order.
+4. Preserve all other task content and remove empty legacy status folders only when the user asks for cleanup.
 
-If legacy board files exist and the user did not ask to migrate them, read them only as legacy context. Do not keep status in both a shared board and per-task files.
+If legacy `docs/kanban.md` or `docs/kanban-done.md` files exist and the user asks to migrate them, convert each card into a task file, preserve its text, map any legacy status to `status`, and assign a wide-gap `order` value. If legacy boards exist without a migration request, read them only as context; do not duplicate state in a shared board and task files.
 
 ## Verification Defaults
 
@@ -205,17 +201,19 @@ Choose verification by the surface touched:
 - Unity/editor changes: prefer Unity EditMode tests, Unity console logs, and targeted Unity editor C# checks.
 - Local service changes: prefer focused `dotnet test` runs for `CopilotService.Tests`.
 - Contract changes: keep OpenAPI/AsyncAPI examples and shared DTO behavior aligned.
-- UI E2E changes: use Unity tests that wait for UI Toolkit layout and async updates instead of assuming same-frame completion.
+- UI E2E changes: use Unity tests that wait for UI Toolkit layout and async updates rather than assuming same-frame completion.
 
-If verification cannot be run, state why and record the residual risk in the task note.
+If verification cannot run, state why and record residual risk in the task note.
+
+For task-file-only changes, run the validation script as the focused verification.
 
 ## Response Format
 
 When you finish a kanban workflow turn, report:
 
-- Selected task and starting folder.
+- Selected task and starting status.
 - What changed in code and task file state.
 - Verification run and result.
-- Current task folder and next action.
+- Current task status, order, and next action.
 
 Keep the final response concise. The task file should carry detailed continuity notes; the chat response should summarize the outcome.
