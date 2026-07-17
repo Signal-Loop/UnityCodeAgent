@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+:root {
+  --ivory: #faf9f5;
+  --slate: #141413;
+  --clay: #d97757;
+  --clay-d: #a94f35;
+  --oat: #e3dacc;
+  --olive: #788c5d;
+  --gray-50: #f0eee6;
+  --gray-200: #d1cfc5;
+  --gray-500: #87867f;
+  --gray-800: #3d3d3a;
+  --drop-bg: #fbf6f2;
+  --error-bg: #fdf1ec;
+  --column-accent: var(--gray-500);
+  color: var(--slate);
+  background: var(--ivory);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--ivory);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 10% 0%, rgb(217 119 87 / 5%), transparent 28rem),
+    var(--ivory);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+section[data-status="Backlog"] {
+  --column-accent: var(--gray-500);
+}
+
+section[data-status="Started"] {
+  --column-accent: #9a805b;
+}
+
+section[data-status="Planning"] {
+  --column-accent: var(--clay);
+}
+
+section[data-status="Ready"] {
+  --column-accent: #b39353;
+}
+
+section[data-status="ToDo"] {
+  --column-accent: #66879b;
+}
+
+section[data-status="InProgress"] {
+  --column-accent: #6c6f9d;
+}
+
+section[data-status="Completed"] {
+  --column-accent: var(--olive);
+}
+
+::selection {
+  color: var(--slate);
+  background: var(--oat);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid var(--ivory);
+  border-radius: 999px;
+  background: var(--gray-200);
+}
