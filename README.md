@@ -1,6 +1,6 @@
 # Unity Code Agent
 
-Unity Code Agent is an AI agent for the Unity Editor. With access to Unity Editor API and project codebase it can:
+Unity Code Agent is an open-source AI agent for the Unity Editor. With access to Unity Editor API and project codebase it can:
 - create or modify scenes, prefabs, ScriptableObjects or assets,
 - change cofiguration,
 - implement game logic.
@@ -13,6 +13,7 @@ Unity Code Agent is based on Github Copilot SDK and supports both BYOK (Bring Yo
 ## Table of Contents
 
 - [Features](#features)
+- [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quickstart](#quickstart)
@@ -34,10 +35,41 @@ Unity Code Agent is based on Github Copilot SDK and supports both BYOK (Bring Yo
 
 ## Features
 
-- Chat with an agent inside the Unity Editor to delegate tasks.
-- Use any OpenAI-compatible provider or GitHub Copilot subscription.
-- Use build-in tools and skills to interact with the Unity Editor, project codebase, and assets.
-- Add custom tools, skills and MCP servers to extend the agent's capabilities.
+
+Unity Code Agent can complete tasks of varying complexity, from modifying a MonoBehaviour or creating a GameObject in a scene to implementing complete game features. It can create scenes, prefabs, and MonoBehaviours; run tests; analyze screenshots; and play the game to verify the implementation.
+
+Combined with file editing and verification tools, this access lets the agent implement and test complex features that span UI, input, game logic, assets, and runtime behavior.
+
+Example tasks:
+
+- Add a gameplay component, attach it to the correct objects, configure its fields, and confirm the scene starts without errors.
+- Create or update prefabs and ScriptableObjects in bulk based on provided data.
+- Implement a UI change, enter Play Mode, navigate the relevant input path, and inspect the visible result.
+- Run a focused Edit Mode or Play Mode test, fix the failure, and rerun it.
+- Validate a short gameplay condition such as movement, a menu transition, a collision response, or a state change.
+- Implement a game feature, create and run tests, analyze screenshots, and play the game to verify the result.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph UnityEditor["Unity Editor"]
+        Client["Unity Code Agent"]
+    end
+
+    subgraph ServiceProcess["UnityCodeAgent Service process (.NET 8)"]
+        Service["Unity Code Agent Service"]
+        SDK["GitHub Copilot SDK"]
+    end
+
+    subgraph CLIProcess["GitHub Copilot CLI process"]
+        CLI["GitHub Copilot CLI"]
+    end
+
+    Client -->|runs| Service
+    Service -->|uses| SDK
+    SDK -->|runs| CLI
+```
 
 ## Requirements
 
@@ -285,7 +317,7 @@ The following task includes:
 - Creating an image asset.
 - Creating input actions.
 - Implementing game logic based on a specification.
-- Testing created features in play mode.
+- Testing game in play mode.
 
 ```
 Create a Snake game.
@@ -300,7 +332,12 @@ Follow Unity best practices for game development. Use the MVC pattern.
 Verify the work using 'play unity game'. Verification should cover movement, eating food, snake growth, collision detection, scoring, and game-over conditions.
 ```
 
-The quality of the selected model, the clarity of the request, and the complexity of the project affect the quality of the result. The agent has all the tools required to investigate and verify tasks through successful completion.
+The quality of the selected model, the clarity of the request, and the complexity of the project affect the quality of the result.
+
+Following example took 19 minutes and cost around $0.40.
+
+![Create Snake game example](images/UnityCodeAgents_snake_Intro.gif)<br/>
+*Unity Code Agent building Snake game.*
 
 ## License
 
