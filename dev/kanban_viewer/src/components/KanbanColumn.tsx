@@ -6,10 +6,11 @@ interface KanbanColumnProps {
   status: KanbanStatus
   tasks: TaskDto[]
   onOpen: (task: TaskDto) => void
+  isHighlighted: boolean
 }
 
-export function KanbanColumn({ status, tasks, onOpen }: KanbanColumnProps) {
-  const { ref, isDropTarget } = useDroppable({
+export function KanbanColumn({ status, tasks, onOpen, isHighlighted }: KanbanColumnProps) {
+  const { ref } = useDroppable({
     id: `column:${status}`,
     type: 'column',
     accept: 'task',
@@ -19,7 +20,7 @@ export function KanbanColumn({ status, tasks, onOpen }: KanbanColumnProps) {
   return (
     <section
       ref={ref}
-      className={`flex h-full min-h-48 w-72 shrink-0 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-[var(--gray-200)] border-t-[3px] border-t-[var(--column-accent)] bg-white transition-[outline,background-color] ${isDropTarget ? 'bg-[var(--drop-bg)] outline-2 outline-offset-[-6px] outline-dashed outline-[var(--clay)]' : ''}`}
+      className={`flex h-full min-h-48 w-72 shrink-0 flex-col overflow-hidden rounded-[10px] border-[1.5px] border-[var(--gray-200)] border-t-[3px] border-t-[var(--column-accent)] bg-white transition-[outline,background-color] ${isHighlighted ? 'bg-[var(--drop-bg)] outline-2 outline-offset-[-6px] outline-dashed outline-[var(--clay)]' : ''}`}
       data-status={status}
     >
       <header className="sticky top-0 z-10 flex items-baseline gap-2 border-b-[1.5px] border-[var(--gray-50)] bg-white px-3.5 py-3">

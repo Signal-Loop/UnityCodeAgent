@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { KanbanStatus, TaskDto } from '../api'
 import { KanbanBoard } from './KanbanBoard'
+import { getDropDestination } from './dropDestination'
 
 const statuses: KanbanStatus[] = [
   'Backlog',
@@ -46,5 +47,32 @@ describe('KanbanBoard', () => {
     expect(onOpen).toHaveBeenCalledTimes(1)
     expect(screen.queryByRole('button', { name: 'Drag Only the task title' })).not.toBeInTheDocument()
     expect(screen.getByTestId('task-task.md')).toHaveClass('cursor-grab')
+  })
+
+  it('uses the sortable source position after reordering over a card', () => {
+    const secondTask: TaskDto = { ...task, path: 'second.md', title: 'Second task', order: 200 }
+    const destination = getDropDestination(
+      task.path,
+      'Backlog',
+      1,
+      { kind: 'task', taskPath: task.path, status: 'Backlog' },
+      [task, secondTask],
+      statuses,
+    )
+
+    expect(destination).toEqual({ status: 'Backlog', index: 1 })
+  })
+
+  it('appends when dropped directly on a column', () => {
+    const destination = getDropDestination(
+      task.path,
+      'Backlog',
+      0,
+      { kind: 'column', status: 'Started' },
+      [task],
+      statuses,
+    )
+
+    expect(destination).toEqual({ status: 'Started', index: 0 })
   })
 })
