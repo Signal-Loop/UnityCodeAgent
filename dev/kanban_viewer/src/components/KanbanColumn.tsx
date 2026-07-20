@@ -7,9 +7,10 @@ interface KanbanColumnProps {
   tasks: TaskDto[]
   onOpen: (task: TaskDto) => void
   isHighlighted: boolean
+  disabled: boolean
 }
 
-export function KanbanColumn({ status, tasks, onOpen, isHighlighted }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onOpen, isHighlighted, disabled }: KanbanColumnProps) {
   const { ref } = useDroppable({
     id: `column:${status}`,
     type: 'column',
@@ -31,7 +32,7 @@ export function KanbanColumn({ status, tasks, onOpen, isHighlighted }: KanbanCol
       </header>
       <div className="flex min-h-20 flex-1 flex-col gap-2 p-2.5">
         {tasks.map((task, index) => (
-          <TaskCard key={task.path} task={task} index={index} onOpen={onOpen} />
+          <TaskCard key={task.path} task={task} index={index} onOpen={onOpen} disabled={disabled} />
         ))}
         {tasks.length === 0 && (
           <div className="grid min-h-20 place-items-center rounded-lg border border-dashed border-[var(--gray-200)] px-4 text-center font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--gray-500)]">

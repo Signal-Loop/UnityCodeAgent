@@ -1,6 +1,6 @@
 # Fix Copilot .NET session list working-directory filter
 - status: Backlog
-- order: 400
+- order: 1000
 - goal: Create a GitHub Copilot SDK PR that makes the .NET public session-list filter match the Node SDK behavior, verified by focused SDK tests for `CopilotClient.ListSessionsAsync(new SessionListFilter { WorkingDirectory = ... })` sending a wire `cwd` filter and returning only matching sessions.
 - updated: 2026-06-30
 - steps:

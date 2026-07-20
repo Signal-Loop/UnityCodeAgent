@@ -1,6 +1,6 @@
 # Check Copilot SDK image tool result handling
 - status: Backlog
-- order: 300
+- order: 1400
 - goal: Determine whether the latest remote GitHub Copilot SDK release has implemented proper image handling for custom tool results, verified against remote release/package state plus local source/tests where useful, and report whether UnityCodeAgent can remove or simplify its screenshot workaround.
 - updated: 2026-06-29
 - steps:

@@ -1,1 +1,0 @@
-"""Kanban viewer backend package."""

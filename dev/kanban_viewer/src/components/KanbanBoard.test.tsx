@@ -42,11 +42,10 @@ describe('KanbanBoard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Only the task title' }))
     expect(onOpen).toHaveBeenCalledWith(task)
     const goal = screen.getByText('This is the task goal.')
-    expect(goal).not.toContainElement(screen.getByRole('button'))
+    expect(goal).not.toContainElement(screen.getByRole('button', { name: 'Only the task title' }))
     fireEvent.click(goal)
     expect(onOpen).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('button', { name: 'Drag Only the task title' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('task-task.md')).toHaveClass('cursor-grab')
+    expect(screen.getByRole('button', { name: 'Drag Only the task title' })).toBeInTheDocument()
   })
 
   it('uses the sortable source position after reordering over a card', () => {
@@ -63,6 +62,18 @@ describe('KanbanBoard', () => {
     expect(destination).toEqual({ status: 'Backlog', index: 1 })
   })
 
+  it('uses the target card status for cross-column movement', () => {
+    const destination = getDropDestination(
+      task.path,
+      'Backlog',
+      0,
+      { kind: 'task', taskPath: 'ready.md', status: 'Ready' },
+      [task, { ...task, path: 'ready.md', status: 'Ready' }],
+      statuses,
+    )
+    expect(destination).toEqual({ status: 'Ready', index: 0 })
+  })
+
   it('appends when dropped directly on a column', () => {
     const destination = getDropDestination(
       task.path,
@@ -74,5 +85,25 @@ describe('KanbanBoard', () => {
     )
 
     expect(destination).toEqual({ status: 'Started', index: 0 })
+  })
+
+  it('uses the live insertion gap instead of appending when a populated column is the target', () => {
+    const readyOne: TaskDto = { ...task, path: 'ready-one.md', status: 'Ready', order: 100 }
+    const readyTwo: TaskDto = { ...task, path: 'ready-two.md', status: 'Ready', order: 200 }
+    const destination = getDropDestination(
+      task.path,
+      'Ready',
+      1,
+      { kind: 'column', status: 'Ready' },
+      [task, readyOne, readyTwo],
+      statuses,
+    )
+
+    expect(destination).toEqual({ status: 'Ready', index: 1 })
+  })
+
+  it('rejects unknown targets and clamps sortable indexes', () => {
+    expect(getDropDestination(task.path, 'Unknown', 0, {}, [task], statuses)).toBeNull()
+    expect(getDropDestination(task.path, 'Backlog', -10, { kind: 'task', status: 'Backlog' }, [task], statuses)).toEqual({ status: 'Backlog', index: 0 })
   })
 })

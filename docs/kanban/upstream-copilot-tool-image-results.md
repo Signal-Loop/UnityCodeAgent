@@ -1,6 +1,6 @@
 # Upstream native image results from custom tools
 - status: Backlog
-- order: 800
+- order: 725
 - goal: Create an upstream pull request that makes binary images returned by custom tools visible to vision-capable models through the native Copilot tool-result flow, proven by an enabled cross-provider regression test, while preserving text/resource tool results and avoiding application-level steering workarounds.
 - updated: 2026-07-09
 - steps:

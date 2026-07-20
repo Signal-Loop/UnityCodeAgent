@@ -1,19 +1,19 @@
 # Refactor kanban viewer to a unified TypeScript stack
 
-- status: Backlog
+- status: Completed
 - order: 90
 - goal: Replace the Python/FastAPI kanban-viewer backend with a maintainable TypeScript/Node service, preserve sparse task ordering, harden filesystem and drag-and-drop reliability, and verify the preserved feature set through deterministic unit, integration, and browser tests without changing the existing HTTP or Markdown contracts.
 - updated: 2026-07-20
 - steps:
-    - [ ] Lock the existing HTTP, Markdown, board, watcher, and drag-and-drop behavior with characterization tests
-    - [ ] Replace the Python/FastAPI backend with a schema-driven Fastify service
-    - [ ] Preserve sparse task ordering and minimize order-property rewrites
-    - [ ] Make Markdown moves serialized, staged, recoverable, and safe against external edits
-    - [ ] Refactor frontend orchestration to prevent stale asynchronous state updates
-    - [ ] Add accessible and reliable pointer, touch, and keyboard drag-and-drop
-    - [ ] Add unified Vitest coverage and Playwright end-to-end tests
-    - [ ] Remove the Python toolchain and document the Node-only workflow
-    - [ ] Run the complete local quality gate and verify the preserved feature set
+    - [x] Lock the existing HTTP, Markdown, board, watcher, and drag-and-drop behavior with characterization tests
+    - [x] Replace the Python/FastAPI backend with a schema-driven Fastify service
+    - [x] Preserve sparse task ordering and minimize order-property rewrites
+    - [x] Make Markdown moves serialized, staged, recoverable, and safe against external edits
+    - [x] Refactor frontend orchestration to prevent stale asynchronous state updates
+    - [x] Add accessible and reliable pointer, touch, and keyboard drag-and-drop
+    - [x] Add unified Vitest coverage and Playwright end-to-end tests
+    - [x] Remove the Python toolchain and document the Node-only workflow
+    - [x] Run the complete local quality gate and verify the preserved feature set
 
 Original request:
 ~~~
@@ -319,3 +319,11 @@ sequenceDiagram
         Controller->>Controller: Reconcile, show error, enable handles
     end
 ```
+
+## Completion
+
+- Replaced FastAPI and the Python repository with a TypeScript Fastify application, shared TypeBox contracts, a serialized transactional Markdown repository, a shared Chokidar watcher, and an injectable VS Code launcher.
+- Preserved sparse ordering and the existing HTTP/Markdown contract while adding source revalidation, staged durable writes, bounded Windows replacement retries, rollback, temporary-file cleanup, symlink containment, and deterministic warning behavior.
+- Made frontend loads and moves generation-aware, coalesced watcher refreshes, reconciled failed mutations against authoritative state, and added visible focusable drag handles with pointer, touch, and keyboard support plus reliable DOM restoration.
+- Removed `.python-version`, `pyproject.toml`, `uv.lock`, the Python backend, and Python tests; documented the Node-only workflow.
+- Verification: repeated `npm ci && npm run check` succeeded. The final gate passed ESLint, 55 Vitest tests with 94.45% statements / 98.51% lines / 92.85% functions / 85.8% branches, TypeScript and Vite production builds, and 3 Playwright tests covering pointer movement and persistence, keyboard cancellation, and trusted touch movement.

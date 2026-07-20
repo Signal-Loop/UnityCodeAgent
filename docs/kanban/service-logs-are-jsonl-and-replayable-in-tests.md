@@ -1,6 +1,6 @@
 # Service logs are JSONL and replayable in tests
 - status: Backlog
-- order: 700
+- order: 728
 - goal: Service events can be replayed using service log, which is JSONL, verified by parser/replay tests and at least one fixture from real event envelopes.
 
 Current service file log is plain text `service.log`; SDK telemetry can write `telemetry.jsonl`.

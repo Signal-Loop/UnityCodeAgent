@@ -30,20 +30,42 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMoving, setIsMoving] = useState(false)
   const [watcherState, setWatcherState] = useState<WatcherState>('connecting')
+  const [watcherRefreshRequest, setWatcherRefreshRequest] = useState(0)
   const movingRef = useRef(false)
+  const generationRef = useRef(0)
+  const activeDirectoryRef = useRef('')
+  const boardRequestRef = useRef<AbortController | null>(null)
+  const pendingWatcherRefreshRef = useRef(false)
 
   const loadBoard = useCallback(async (directory: string, activate = false) => {
-    const nextBoard = await getBoard(directory)
+    const generation = activate ? ++generationRef.current : generationRef.current
+    boardRequestRef.current?.abort()
+    const controller = new AbortController()
+    boardRequestRef.current = controller
+    const nextBoard = await getBoard(directory, controller.signal).finally(() => {
+      if (boardRequestRef.current === controller) boardRequestRef.current = null
+    })
+    if (generation !== generationRef.current) return null
     setBoard(nextBoard)
     setError('')
     if (activate) {
       setWatcherState('connecting')
       setActiveDirectory(nextBoard.directory)
+      activeDirectoryRef.current = nextBoard.directory
       setFolderInput(nextBoard.directory)
       localStorage.setItem(STORAGE_KEY, nextBoard.directory)
     }
+    if (!activate && pendingWatcherRefreshRef.current && !movingRef.current && activeDirectoryRef.current) {
+      pendingWatcherRefreshRef.current = false
+      setWatcherRefreshRequest((request) => request + 1)
+    }
     return nextBoard
   }, [])
+
+  useEffect(() => {
+    if (!watcherRefreshRequest || !activeDirectoryRef.current) return
+    void loadBoard(activeDirectoryRef.current).catch((watchError) => setError(errorMessage(watchError)))
+  }, [loadBoard, watcherRefreshRequest])
 
   useEffect(() => {
     let cancelled = false
@@ -70,20 +92,24 @@ export default function App() {
     void initialize()
     return () => {
       cancelled = true
+      generationRef.current += 1
+      boardRequestRef.current?.abort()
     }
   }, [loadBoard])
 
   useEffect(() => {
     if (!activeDirectory) return
+    const generation = generationRef.current
     const source = new EventSource(eventsUrl(activeDirectory))
-    source.onopen = () => setWatcherState('connected')
-    source.onerror = () => setWatcherState('disconnected')
+    source.onopen = () => { if (generation === generationRef.current) setWatcherState('connected') }
+    source.onerror = () => { if (generation === generationRef.current) setWatcherState('disconnected') }
     source.addEventListener('board-changed', () => {
-      if (!movingRef.current) {
-        void loadBoard(activeDirectory).catch((watchError) => {
-          setError(errorMessage(watchError))
-        })
+      if (generation !== generationRef.current) return
+      if (movingRef.current || boardRequestRef.current) {
+        pendingWatcherRefreshRef.current = true
+        return
       }
+      void loadBoard(activeDirectory).catch((watchError) => setError(errorMessage(watchError)))
     })
     return () => source.close()
   }, [activeDirectory, loadBoard])
@@ -120,7 +146,8 @@ export default function App() {
     targetStatus: KanbanStatus,
     targetIndex: number,
   ) => {
-    if (!board || isMoving || !config) return
+    if (!board || movingRef.current || !config) return
+    const generation = generationRef.current
     const previousBoard = board
     const optimisticBoard: BoardResponse = {
       ...board,
@@ -138,18 +165,26 @@ export default function App() {
         target_index: targetIndex,
         revision: board.revision,
       })
-      setBoard(updated)
+      if (generation === generationRef.current) setBoard(updated)
     } catch (moveError) {
-      setBoard(previousBoard)
-      setError(errorMessage(moveError))
+      if (generation !== generationRef.current) return
+      const mutationError = errorMessage(moveError)
       try {
-        await loadBoard(previousBoard.directory)
+        const authoritative = await loadBoard(previousBoard.directory)
+        if (!authoritative && generation === generationRef.current) setBoard(previousBoard)
       } catch {
-        // Keep the original board and mutation error if refresh also fails.
+        if (generation === generationRef.current) setBoard(previousBoard)
       }
+      if (generation === generationRef.current) setError(mutationError)
     } finally {
       movingRef.current = false
-      setIsMoving(false)
+      if (generation === generationRef.current) {
+        setIsMoving(false)
+        if (pendingWatcherRefreshRef.current) {
+          pendingWatcherRefreshRef.current = false
+          void loadBoard(activeDirectoryRef.current).catch((watchError) => setError(errorMessage(watchError)))
+        }
+      }
     }
   }
 
@@ -257,12 +292,16 @@ export default function App() {
           Loading board…
         </div>
       ) : board && config ? (
+        <div aria-busy={isMoving}>
         <KanbanBoard
           statuses={config.statuses}
           tasks={board.tasks}
+          disabled={isMoving}
           onMove={(taskPath, status, index) => void handleMove(taskPath, status, index)}
           onOpen={(task) => void handleOpen(task)}
         />
+        {isMoving && <p role="status" className="font-mono text-xs text-[var(--gray-500)]">Saving task move…</p>}
+        </div>
       ) : (
         <div className="grid min-h-80 place-items-center rounded-lg border border-dashed border-[var(--gray-200)] text-sm text-[var(--gray-500)]">
           The board could not be loaded.

@@ -1,6 +1,6 @@
 # Ollama is supported
 - status: Backlog
-- order: 600
+- order: 362
 - goal: Support local OpenAI-compatible Ollama endpoints over loopback HTTP, verified by fake `/models` responses, while keeping non-loopback BYOK URLs HTTPS-only.
 
 Current BYOK validation requires HTTPS, which blocks common local Ollama URLs like `http://127.0.0.1:11434/v1`.

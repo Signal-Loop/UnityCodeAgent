@@ -35,4 +35,9 @@ describe('reorderTasks', () => {
     ])
     expect(result.find((task) => task.path === 'b.md')?.status).toBe('Ready')
   })
+
+  it('returns the same tasks when the selected path is absent and clamps indexes', () => {
+    expect(reorderTasks(tasks, 'missing.md', 'Ready', 0, statuses)).toBe(tasks)
+    expect(reorderTasks(tasks, 'a.md', 'Ready', 99, statuses).filter((task) => task.status === 'Ready').map((task) => task.path)).toEqual(['c.md', 'a.md'])
+  })
 })

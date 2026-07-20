@@ -13,8 +13,30 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-    css: true,
+    projects: [
+      {
+        test: {
+          name: 'browser',
+          include: ['src/**/*.test.{ts,tsx}'],
+          environment: 'jsdom',
+          setupFiles: './src/test/setup.ts',
+          css: true,
+        },
+      },
+      {
+        test: {
+          name: 'server',
+          include: ['tests/**/*.test.ts'],
+          environment: 'node',
+        },
+      },
+    ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+      include: ['src/**/*.{ts,tsx}', 'server/**/*.ts', 'shared/**/*.ts'],
+      exclude: ['src/main.tsx', 'server/index.ts'],
+      thresholds: { statements: 90, lines: 90, functions: 90, branches: 85 },
+    },
   },
 })

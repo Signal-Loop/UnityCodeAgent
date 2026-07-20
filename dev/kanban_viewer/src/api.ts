@@ -1,58 +1,19 @@
-export type KanbanStatus =
-  | 'Backlog'
-  | 'Started'
-  | 'Planning'
-  | 'Ready'
-  | 'ToDo'
-  | 'InProgress'
-  | 'Completed'
+export type {
+  BoardResponse,
+  BoardWarning,
+  ConfigResponse,
+  KanbanStatus,
+  MoveTaskRequest,
+  TaskDto,
+} from '../shared/contracts'
+import type { BoardResponse, ConfigResponse, MoveTaskRequest } from '../shared/contracts'
 
-export interface TaskDto {
-  path: string
-  title: string
-  goal: string | null
-  status: KanbanStatus
-  order: number
-  version: string
-}
-
-export interface BoardWarning {
-  path: string
-  message: string
-}
-
-export interface BoardResponse {
-  directory: string
-  revision: string
-  tasks: TaskDto[]
-  warnings: BoardWarning[]
-}
-
-export interface ConfigResponse {
-  workspace_root: string
-  default_task_directory: string
-  statuses: KanbanStatus[]
-}
-
-export interface MoveTaskRequest {
-  directory: string
-  task_path: string
-  target_status: KanbanStatus
-  target_index: number
-  revision: string
-}
-
-interface ApiErrorBody {
-  detail?: string
-}
+interface ApiErrorBody { detail?: string }
 
 export class ApiError extends Error {
-  readonly status: number
-
-  constructor(message: string, status: number) {
+  constructor(message: string, readonly status: number) {
     super(message)
     this.name = 'ApiError'
-    this.status = status
   }
 }
 
@@ -62,47 +23,33 @@ async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise
     let message = `Request failed with status ${response.status}.`
     try {
       const body = (await response.json()) as ApiErrorBody
-      if (body.detail) {
-        message = body.detail
-      }
-    } catch {
-      // Keep the status-based fallback for non-JSON errors.
-    }
+      if (body.detail) message = body.detail
+    } catch { /* retain the status fallback */ }
     throw new ApiError(message, response.status)
   }
-
-  if (response.status === 204) {
-    return undefined as T
-  }
-  return (await response.json()) as T
+  return response.status === 204 ? undefined as T : await response.json() as T
 }
 
-export function getConfig(): Promise<ConfigResponse> {
-  return request<ConfigResponse>('/api/config')
+export function getConfig(signal?: AbortSignal): Promise<ConfigResponse> {
+  return request<ConfigResponse>('/api/config', { signal })
 }
 
-export function getBoard(directory: string): Promise<BoardResponse> {
-  const params = new URLSearchParams({ directory })
-  return request<BoardResponse>(`/api/board?${params}`)
+export function getBoard(directory: string, signal?: AbortSignal): Promise<BoardResponse> {
+  return request<BoardResponse>(`/api/board?${new URLSearchParams({ directory })}`, { signal })
 }
 
-export function moveTask(move: MoveTaskRequest): Promise<BoardResponse> {
+export function moveTask(move: MoveTaskRequest, signal?: AbortSignal): Promise<BoardResponse> {
   return request<BoardResponse>('/api/board/tasks', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(move),
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(move), signal,
   })
 }
 
-export function openTask(directory: string, taskPath: string): Promise<void> {
+export function openTask(directory: string, taskPath: string, signal?: AbortSignal): Promise<void> {
   return request<void>('/api/editor/open', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ directory, task_path: taskPath }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ directory, task_path: taskPath }), signal,
   })
 }
 
 export function eventsUrl(directory: string): string {
-  const params = new URLSearchParams({ directory })
-  return `/api/events?${params}`
+  return `/api/events?${new URLSearchParams({ directory })}`
 }

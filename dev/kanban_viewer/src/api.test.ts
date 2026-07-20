@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, eventsUrl, getBoard, moveTask, openTask } from './api'
+import { ApiError, eventsUrl, getBoard, getConfig, moveTask, openTask } from './api'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -37,5 +37,13 @@ describe('API client', () => {
 
     await expect(getBoard('board')).rejects.toEqual(new ApiError('Board changed.', 409))
     await expect(openTask('board', 'task.md')).resolves.toBeUndefined()
+  })
+
+  it('loads config and falls back for non-JSON errors', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ statuses: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }))
+    await expect(getConfig()).resolves.toEqual({ statuses: [] })
+    await expect(getBoard('board')).rejects.toEqual(new ApiError('Request failed with status 502.', 502))
   })
 })

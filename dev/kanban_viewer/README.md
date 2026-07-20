@@ -7,12 +7,10 @@ A small local board for the repository's Markdown kanban tasks. It reads each ta
 From `dev/kanban_viewer`:
 
 ```powershell
-uv python install 3.11
-uv sync
-npm install
+npm ci
 ```
 
-uv, Node.js, npm, and the VS Code `code` command must be available on `PATH`. The checked-in `.python-version` pins the backend to Python 3.11; uv creates and maintains its environment from `pyproject.toml` and `uv.lock` automatically.
+Node.js `^20.19.0` or `>=22.12.0`, npm, and the VS Code `code` command must be available on `PATH`.
 
 ## Run
 
@@ -20,9 +18,9 @@ uv, Node.js, npm, and the VS Code `code` command must be available on `PATH`. Th
 npm run dev
 ```
 
-This starts FastAPI through uv at `http://127.0.0.1:8765` and Vite at `http://127.0.0.1:5173`. On the first run, uv installs the pinned Python and backend dependencies when needed. Open the Vite URL in a browser. The default task folder is `<workspace>/docs/kanban`; enter an absolute path or a workspace-relative path to use another folder.
+This starts the Fastify service through `tsx watch` at `http://127.0.0.1:8765` and Vite at `http://127.0.0.1:5173`. Open the Vite URL in a browser. The default task folder is `<workspace>/docs/kanban`; enter an absolute path or a workspace-relative path to use another folder.
 
-The selected folder is stored only in the browser. The backend binds to loopback, validates that task paths stay inside that folder, and edits only the `status` and `order` property lines.
+The selected folder is stored only in the browser. The Node service binds to loopback, validates that task paths stay inside that folder, and edits only the `status` and `order` property lines. Shared TypeBox schemas under `shared/` keep the React client and Fastify API on the same TypeScript contract.
 
 ## Verify
 
@@ -30,4 +28,4 @@ The selected folder is stored only in the browser. The backend binds to loopback
 npm run check
 ```
 
-Individual commands are `npm run lint`, `npm test`, `npm run test:backend`, and `npm run build`.
+The complete check runs ESLint, Vitest with coverage, the production build, and Playwright. Focused commands are `npm test`, `npm run test:backend`, `npm run test:e2e`, and `npm run build`.

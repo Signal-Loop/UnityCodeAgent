@@ -1,6 +1,6 @@
 # Add marker-only sessions list refresh
 - status: Backlog
-- order: 200
+- order: 1200
 - goal: Add live sessions-list marker refresh without caching session summaries in `ChatEditorWindowClient`, verified by focused client/UI tests while keeping session list ownership simple.
 - updated: 2026-07-07
 - steps:

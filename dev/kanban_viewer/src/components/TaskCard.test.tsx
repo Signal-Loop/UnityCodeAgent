@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TaskDto } from '../api'
 import { TaskCard } from './TaskCard'
@@ -20,7 +20,7 @@ const task: TaskDto = {
 
 describe('TaskCard', () => {
   beforeEach(() => {
-    dnd.useSortable.mockReturnValue({ ref: vi.fn(), isDragging: false })
+    dnd.useSortable.mockReturnValue({ ref: vi.fn(), handleRef: vi.fn(), isDragging: false })
   })
 
   it('registers as one sortable task in its status group', () => {
@@ -43,5 +43,11 @@ describe('TaskCard', () => {
     expect(dnd.useSortable).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ taskPath: task.path }) }),
     )
+  })
+
+  it('disables the visible drag handle while saving', () => {
+    render(<TaskCard task={task} index={0} onOpen={vi.fn()} disabled />)
+    expect(screen.getByRole('button', { name: 'Drag Task' })).toBeDisabled()
+    expect(dnd.useSortable).toHaveBeenCalledWith(expect.objectContaining({ disabled: true }))
   })
 })

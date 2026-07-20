@@ -1,7 +1,7 @@
 # Add interchangeable Codex agent service
 
 - status: Backlog
-- order: 80
+- order: 181
 - goal: Add a maintainable Python Codex service that implements the existing agent-service contracts and can be selected from Unity through one authoritative service mode, while keeping Copilot and Codex sessions and runtime state isolated and preserving existing GitHub Copilot and BYOK behavior.
 - updated: 2026-07-20
 - steps:
