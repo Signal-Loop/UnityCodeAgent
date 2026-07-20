@@ -37,6 +37,7 @@ def test_config_and_board_endpoints(tmp_path: Path) -> None:
     assert config.json()["default_task_directory"] == str(board)
     assert response.status_code == 200
     assert response.json()["tasks"][0]["title"] == "Task"
+    assert response.json()["tasks"][0]["goal"] is None
 
 
 def test_move_endpoint_returns_conflict_for_stale_revision(tmp_path: Path) -> None:

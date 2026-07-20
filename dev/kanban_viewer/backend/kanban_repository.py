@@ -22,6 +22,7 @@ STATUSES = (
 _TITLE_PATTERN = re.compile(r"^#\s+(.+?)\s*$", re.MULTILINE)
 _STATUS_PATTERN = re.compile(r"^- status:\s*(.*?)\s*$", re.MULTILINE)
 _ORDER_PATTERN = re.compile(r"^- order:\s*(.*?)\s*$", re.MULTILINE)
+_GOAL_PATTERN = re.compile(r"^- goal:\s*(.*?)\s*$", re.MULTILINE)
 _UTF8_BOM = b"\xef\xbb\xbf"
 
 
@@ -45,6 +46,7 @@ class StaleBoardError(KanbanRepositoryError):
 class TaskRecord:
     path: str
     title: str
+    goal: str | None
     status: str
     order: int
     version: str
@@ -207,6 +209,7 @@ class KanbanRepository:
         title_matches = _TITLE_PATTERN.findall(text)
         status_matches = _STATUS_PATTERN.findall(text)
         order_matches = _ORDER_PATTERN.findall(text)
+        goal_matches = _GOAL_PATTERN.findall(text)
 
         if not title_matches:
             return None, ParseWarning(relative_path, "Missing H1 task title.")
@@ -227,7 +230,14 @@ class KanbanRepository:
             return None, ParseWarning(relative_path, "Order must be a positive integer.")
 
         return (
-            TaskRecord(relative_path, title_matches[0].strip(), status, order, version),
+            TaskRecord(
+                relative_path,
+                title_matches[0].strip(),
+                goal_matches[0].strip() if goal_matches else None,
+                status,
+                order,
+                version,
+            ),
             None,
         )
 

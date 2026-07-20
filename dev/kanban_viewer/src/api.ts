@@ -10,6 +10,7 @@ export type KanbanStatus =
 export interface TaskDto {
   path: string
   title: string
+  goal: string | null
   status: KanbanStatus
   order: number
   version: string

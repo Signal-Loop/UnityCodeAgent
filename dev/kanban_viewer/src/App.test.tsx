@@ -28,6 +28,7 @@ const initialBoard: BoardResponse = {
     {
       path: 'one.md',
       title: 'Initial task',
+      goal: null,
       status: 'Backlog',
       order: 100,
       version: 'one',
@@ -99,6 +100,7 @@ describe('App', () => {
         {
           path: 'two.md',
           title: 'Task from watcher',
+          goal: null,
           status: 'Planning',
           order: 100,
           version: 'two',

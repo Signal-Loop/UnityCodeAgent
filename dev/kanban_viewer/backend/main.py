@@ -26,6 +26,7 @@ from .kanban_repository import (
 class TaskDto(BaseModel):
     path: str
     title: str
+    goal: str | None
     status: str
     order: int
     version: str
@@ -84,10 +85,11 @@ def _board_response(snapshot: BoardSnapshot) -> BoardResponse:
     )
 
 
-def _task_dict(task: TaskRecord) -> dict[str, str | int]:
+def _task_dict(task: TaskRecord) -> dict[str, str | int | None]:
     return {
         "path": task.path,
         "title": task.title,
+        "goal": task.goal,
         "status": task.status,
         "order": task.order,
         "version": task.version,

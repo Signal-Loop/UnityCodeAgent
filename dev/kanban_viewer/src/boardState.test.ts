@@ -13,9 +13,9 @@ const statuses: KanbanStatus[] = [
 ]
 
 const tasks: TaskDto[] = [
-  { path: 'a.md', title: 'A', status: 'Backlog', order: 100, version: 'a' },
-  { path: 'b.md', title: 'B', status: 'Backlog', order: 200, version: 'b' },
-  { path: 'c.md', title: 'C', status: 'Ready', order: 100, version: 'c' },
+  { path: 'a.md', title: 'A', goal: null, status: 'Backlog', order: 100, version: 'a' },
+  { path: 'b.md', title: 'B', goal: null, status: 'Backlog', order: 200, version: 'b' },
+  { path: 'c.md', title: 'C', goal: null, status: 'Ready', order: 100, version: 'c' },
 ]
 
 describe('reorderTasks', () => {

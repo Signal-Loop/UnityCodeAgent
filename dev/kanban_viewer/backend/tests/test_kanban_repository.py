@@ -54,6 +54,20 @@ def test_load_board_recurses_sorts_and_reports_invalid_files(tmp_path: Path) -> 
     ]
 
 
+def test_load_board_reads_optional_goal(tmp_path: Path) -> None:
+    task = write_task(tmp_path, "task.md", title="Task", status="Backlog", order=100)
+    task.write_text(
+        task.read_text(encoding="utf-8").replace(
+            "- order: 100", "- order: 100\n- goal: Display the task goal on its card."
+        ),
+        encoding="utf-8",
+    )
+
+    board = KanbanRepository(tmp_path).load_board(tmp_path)
+
+    assert board.tasks[0].goal == "Display the task goal on its card."
+
+
 def test_duplicate_orders_are_stable_and_warned(tmp_path: Path) -> None:
     write_task(tmp_path, "b.md", title="B", status="Ready", order=100)
     write_task(tmp_path, "a.md", title="A", status="Ready", order=100)
