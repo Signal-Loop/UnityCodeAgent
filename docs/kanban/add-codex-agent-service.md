@@ -1,7 +1,7 @@
 # Add interchangeable Codex agent service
 
-- status: Backlog
-- order: 181
+- status: ToDo
+- order: 100
 - goal: Add a maintainable Python Codex service that implements the existing agent-service contracts and can be selected from Unity through one authoritative service mode, while keeping Copilot and Codex sessions and runtime state isolated and preserving existing GitHub Copilot and BYOK behavior.
 - updated: 2026-07-20
 - steps:
@@ -24,17 +24,28 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - Keep each service's sessions separate.
 - Avoid complexity and invalid states caused by independently persisted backend and provider variables.
 
+## Research
+
+- The existing persisted selector is `UnityCodeAgentSettings.ProviderType`, backed by `UnityCodeAgentProviderType { Copilot = 0, Byok = 1 }`. Model selection is currently cached only by normalized BYOK base URL, so Codex would otherwise collide with Copilot state.
+- `UnityContext` carries provider and one `UnityCodeAgentPaths`; `ServiceBootstrap`, `AgentService`, `ChatEditorWindowClient`, `EventStreamCursorStore`, and `ActiveSessionState` each assume one backend. The current runtime path is `.unityCodeAgent/service/`, the endpoint manifest is version 1 with no service identity, and the event cursor is global.
+- The chat surface is UI Toolkit (`ChatWindow.uxml`/`ChatWindow.uss`), while the settings inspector currently uses IMGUI. The new toolbar selector must be a UXML/USS control; the settings selector must still write the same serialized mode and notify an open chat window so both surfaces cannot drift.
+- The current contracts expose health, model listing, mapped session list/create/open/send/abort, tool-result completion, no-Unity stop, and one global SSE stream. JSON DTOs use PascalCase, send/abort/tool results return 202, stale tool results return 404, and SSE replay uses `Last-Event-ID` plus a manifest stream-generation ID.
+- The official [Codex Python SDK](https://github.com/openai/codex/tree/main/sdk/python) now supports Python 3.10+, reuses existing Codex authentication, and installs a matching pinned `openai-codex-cli-bin` runtime. Its async API exposes model listing, thread start/list/resume/read, streamed typed/unknown notifications, turn interruption, compaction, workspace-write sandboxing, and automatic approval review. The implementation must pin a published SDK release in `uv.lock`, not depend on the moving `main` branch.
+- `AsyncCodex.thread_start` and `thread_resume` accept a thread-scoped raw `config` object. Use that seam for MCP and skill overrides, with an integration test against the locked SDK proving that the process-private MCP server is visible only to the intended thread. Do not write Unity-generated MCP configuration to the user's global Codex config.
+- The official SDK routes turn notifications by turn ID and documents concurrent active turns on one client. That supports one lifespan-owned client, per-session operation serialization, and cross-session concurrency without one Codex process per Unity session.
+- `uv run --project` would otherwise place `.venv` beside the packaged service. Bootstrap must set `UV_PROJECT_ENVIRONMENT` and `UV_CACHE_DIR` to Codex-owned project runtime paths before invoking the locked console entry point.
+
 ## Plan
 
 ### Single authoritative service mode
 
 - Add one persisted selector: `AgentServiceMode { GitHubCopilot = 0, Byok = 1, Codex = 2 }`.
-- Replace the existing persisted Copilot/BYOK provider choice in place, preserving its serialized field identity and numeric values 0 and 1; append Codex as value 2 so existing settings remain valid.
+- Replace the existing persisted Copilot/BYOK provider choice with `ServiceMode`, using `FormerlySerializedAs("ProviderType")` and preserving numeric values 0 and 1; append Codex as value 2 so existing settings assets migrate without a prompt.
 - Do not persist or independently mutate an AgentServiceBackend value.
 - If routing needs a backend kind, expose it only as a pure derived value: Codex maps to the Codex service; GitHubCopilot and Byok map to the existing Copilot service.
 - Resolve the selected mode through one immutable AgentServiceDescriptor containing service root, launch strategy, runtime paths, model-cache namespace, applicable settings, and provider-request factory.
 - Pass a selected mode or resolved descriptor through an operation, never an independently supplied backend/provider pair.
-- Bind the chat toolbar and settings controls directly to the same mode field. Show and use BYOK inputs only for Byok.
+- Bind the chat toolbar and settings controls directly to the same mode field and one mode-changed notification path. Show and use BYOK inputs only for Byok.
 - Add exhaustive invariant tests proving unsupported combinations such as Codex with BYOK credentials cannot be represented.
 
 ### Python Codex service
@@ -42,7 +53,7 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - Create `Packages/com.signal-loop.unitycodeagent/Editor/CodexService~` as a Python 3.12 packaged project with `pyproject.toml`, checked-in `uv.lock`, `src/`, `tests/`, and a console entry point.
 - Use FastAPI, Uvicorn, Pydantic, SQLite, the official Python MCP SDK, and the asynchronous `openai-codex` SDK.
 - Launch with `uv run --locked --no-dev --project <CodexService~> unity-code-agent-codex-service`.
-- Put its virtual environment and optional cache under `.unityCodeAgent/services/codex/`. Require uv on PATH and report an actionable error instead of installing it silently.
+- Set `UV_PROJECT_ENVIRONMENT` and `UV_CACHE_DIR` so the virtual environment and cache live under `.unityCodeAgent/services/codex/`, never under the installed package. Require uv on PATH and report an actionable error instead of installing it silently.
 - Run one long-lived AsyncCodex client from the application lifespan and use the SDK-bundled Codex runtime by default.
 - Isolate SDK-specific types behind a small adapter so orchestration and endpoint tests use a deterministic fake and SDK upgrades remain localized.
 - Reuse existing Codex/ChatGPT authentication. Use project-root workspace-write sandboxing and automatic review. Fail an unsupported interactive approval with an actionable turn error rather than hanging.
@@ -65,6 +76,7 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - Keep the Unity session ID separate from the Codex thread ID. Persist mappings and request configuration signatures in a Codex-owned, schema-versioned SQLite database using WAL mode.
 - List only mapped sessions and never expose unrelated threads from the user's general Codex history.
 - Persist creation atomically, recover mappings after restart, and resume the mapped thread when opening a session.
+- Rebuild the existing contract history on open from `thread_read(include_turns=True)`, translating only the mapped thread and normalizing any turn left busy by a service crash to an interrupted/idle state.
 - Serialize operations within one session while allowing different sessions to execute concurrently.
 - Host a process-private Streamable HTTP MCP endpoint for Unity tools supplied through the service contract.
 - Protect it with an unguessable per-process token and scope its tool registry to the external session.
@@ -77,12 +89,12 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - Version the endpoint manifest and add serviceKind. Accept the legacy manifest path only as a Copilot fallback; Codex must never read it.
 - Refactor bootstrap around the descriptor registry: Copilot retains executable/dotnet startup and Codex uses the locked uv command.
 - Resolve one immutable descriptor snapshot at the start of bootstrap, request construction, or event connection so settings changes cannot create mixed-backend operations.
-- Key clients, manifests, model caches, SSE cursors, and remembered active sessions by derived backend kind.
+- Key runtime clients, manifests, SSE cursors, and remembered active sessions by derived backend kind. Key selected models and available-model inventories by the descriptor's mode/provider cache namespace so GitHub Copilot, each BYOK base URL, and Codex cannot reuse one another's model catalog.
 - Block mode changes while sending, aborting, or waiting for a Unity tool result and show an explanatory progress message.
 - When switching while idle, close the old SSE subscription, start or reconnect the selected service, and load only that service's models and sessions.
 - Remember the active session independently per derived backend and never submit one backend's session ID to another.
 - Permit both processes to remain running for fast switching.
-- Implement the selector with UI Toolkit UXML/USS and no inline styles.
+- Implement both selectors with UI Toolkit controls and USS, with no inline styles. Migrate the provider/model portion of the existing custom settings inspector to `CreateInspectorGUI`; legacy custom sections may remain inside contained adapters during this task, but both selectors must mutate only `ServiceMode` and use the same switching coordinator.
 
 ### Reliability and operations
 
@@ -141,11 +153,11 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 @startuml
 !include <C4/C4_Context>
 title System Context - Interchangeable Agent Services
-Person(user, "Unity Editor user", "Selects a service mode and chats")
-System(unity, "UnityCodeAgent Unity package", "Editor UI, bootstrap, and thin service client")
-System_Ext(copilot, "Copilot Agent Service", ".NET service using GitHub Copilot SDK")
-System_Ext(codex, "Codex Agent Service", "Python service using Codex SDK")
-System_Ext(editor, "Unity Editor", "Project state and Unity tool execution")
+Person(user, "Unity Editor user", "Unchanged: selects a service mode and chats")
+System(unity, "UnityCodeAgent Unity package", "Changed: routes one selected mode through a backend descriptor")
+System_Ext(copilot, "Copilot Agent Service", "Changed paths/manifest; existing .NET Copilot and BYOK behavior")
+System_Ext(codex, "Codex Agent Service", "New: Python service using Codex SDK")
+System_Ext(editor, "Unity Editor", "Unchanged: project state and Unity tool execution")
 Rel(user, unity, "Selects GitHub Copilot, BYOK, or Codex")
 Rel(unity, copilot, "HTTP + SSE for GitHubCopilot or Byok")
 Rel(unity, codex, "HTTP + SSE for Codex")
@@ -162,12 +174,12 @@ Rel(codex, editor, "Invokes Unity tools through client bridge")
 title Container - Backend Selection and Isolated State
 Person(user, "Unity Editor user")
 System_Boundary(uca, "UnityCodeAgent") {
-  Container(ui, "Chat and Settings UI", "Unity UI Toolkit", "Edits one AgentServiceMode")
-  Container(client, "Unity Agent Client", "C#", "Resolves descriptor and owns backend-keyed state")
-  Container(copilotService, "Copilot Service", ".NET 8 / Copilot SDK", "GitHub Copilot and BYOK sessions")
-  Container(codexService, "Codex Service", "Python / FastAPI / Codex SDK", "Codex sessions, events, tools, and lifecycle")
-  ContainerDb(copilotState, "Copilot State", "Manifest/logs/session state", "Isolated Copilot runtime")
-  ContainerDb(codexState, "Codex State", "SQLite/manifest/logs", "Isolated Codex runtime")
+  Container(ui, "Chat and Settings UI", "Unity UI Toolkit", "Changed: edits one AgentServiceMode")
+  Container(client, "Unity Agent Client", "C#", "Changed: resolves descriptor and owns backend-keyed state")
+  Container(copilotService, "Copilot Service", ".NET 8 / Copilot SDK", "Changed runtime paths; existing GitHub Copilot and BYOK behavior")
+  Container(codexService, "Codex Service", "Python / FastAPI / Codex SDK", "New: Codex sessions, events, tools, and lifecycle")
+  ContainerDb(copilotState, "Copilot State", "Manifest/logs/session state", "Changed: isolated Copilot runtime")
+  ContainerDb(codexState, "Codex State", "SQLite/manifest/logs", "New: isolated Codex runtime")
 }
 Rel(user, ui, "Chooses mode and chats")
 Rel(ui, client, "Single AgentServiceMode")
@@ -185,18 +197,18 @@ Rel(codexService, codexState, "Owns")
 !include <C4/C4_Component>
 title Component - Codex Service and Unity Routing
 Container_Boundary(unityClient, "Unity Agent Client") {
-  Component(mode, "AgentServiceMode", "Enum setting", "Single persisted choice")
-  Component(registry, "Descriptor Registry", "C#", "Pure mode-to-routing mapping")
-  Component(bootstrap, "Service Bootstrap", "C#", "Starts or reconnects resolved service")
-  Component(chat, "Chat Client", "C#", "Backend-keyed sessions, models, and SSE state")
+  Component(mode, "AgentServiceMode", "Enum setting", "Changed: single persisted choice")
+  Component(registry, "Descriptor Registry", "C#", "New: pure mode-to-routing mapping")
+  Component(bootstrap, "Service Bootstrap", "C#", "Changed: starts or reconnects resolved service")
+  Component(chat, "Chat Client", "C#", "Changed: backend-keyed sessions and SSE; descriptor-keyed models")
 }
 Container_Boundary(codexService, "Codex Agent Service") {
-  Component(api, "Contract API", "FastAPI/Pydantic", "HTTP and SSE contracts")
-  Component(coordinator, "Session Coordinator", "Python", "Session lifecycle and turns")
-  Component(adapter, "Codex SDK Adapter", "Python", "AsyncCodex operations")
-  Component(events, "Event Broker", "Python", "Sequences, retains, and streams events")
-  Component(tools, "Unity MCP Bridge", "Python MCP SDK", "Relays Unity tools")
-  ComponentDb(store, "Session Store", "SQLite", "External-to-Codex thread mappings")
+  Component(api, "Contract API", "FastAPI/Pydantic", "New: HTTP and SSE contracts")
+  Component(coordinator, "Session Coordinator", "Python", "New: session lifecycle and turns")
+  Component(adapter, "Codex SDK Adapter", "Python", "New: AsyncCodex operations")
+  Component(events, "Event Broker", "Python", "New: sequences, retains, and streams events")
+  Component(tools, "Unity MCP Bridge", "Python MCP SDK", "New: relays Unity tools")
+  ComponentDb(store, "Session Store", "SQLite", "New: external-to-Codex thread mappings")
 }
 Rel(mode, registry, "Resolved by")
 Rel(registry, bootstrap, "Provides descriptor")
@@ -216,12 +228,13 @@ Rel(tools, events, "Publishes invocation requests")
 ```mermaid
 classDiagram
     class AgentServiceMode {
-        <<enumeration>>
+        <<changed enumeration>>
         GitHubCopilot = 0
         Byok = 1
         Codex = 2
     }
     class AgentServiceDescriptor {
+        <<new>>
         +Mode
         +DerivedBackendKind
         +ServiceRoot
@@ -231,16 +244,20 @@ classDiagram
         +CreateProviderConfig()
     }
     class AgentServiceDescriptorRegistry {
+        <<new>>
         +Resolve(AgentServiceMode) AgentServiceDescriptor
     }
     class ServiceBootstrap {
+        <<changed>>
         +EnsureRunningAsync(AgentServiceDescriptor)
     }
     class ChatEditorWindowClient {
+        <<changed>>
         -stateByBackend
         +SwitchModeAsync(AgentServiceMode)
     }
     class CodexSdkAdapter {
+        <<new>>
         +ListModelsAsync()
         +StartThreadAsync()
         +ResumeThreadAsync()
@@ -248,12 +265,14 @@ classDiagram
         +InterruptTurnAsync()
     }
     class CodexSessionCoordinator {
+        <<new>>
         +CreateAsync()
         +OpenAsync()
         +SendAsync()
         +AbortAsync()
     }
     class SessionMappingStore {
+        <<new>>
         +SaveMappingAsync()
         +FindMappingAsync()
         +ListMappingsAsync()
