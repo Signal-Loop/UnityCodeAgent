@@ -1,9 +1,9 @@
 # Add interchangeable Codex agent service
 
-- status: ToDo
-- order: 100
+- status: Ready
+- order: 50
 - goal: Add a maintainable Python Codex service that implements the existing agent-service contracts and can be selected from Unity through one authoritative service mode, while keeping Copilot and Codex sessions and runtime state isolated and preserving existing GitHub Copilot and BYOK behavior.
-- updated: 2026-07-20
+- updated: 2026-07-21
 - steps:
     - [ ] Add the locked uv Python service and Codex SDK adapter
     - [ ] Implement the existing HTTP, SSE, session, model, tool, skill, MCP, lifecycle, and telemetry contracts
@@ -29,7 +29,8 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - The existing persisted selector is `UnityCodeAgentSettings.ProviderType`, backed by `UnityCodeAgentProviderType { Copilot = 0, Byok = 1 }`. Model selection is currently cached only by normalized BYOK base URL, so Codex would otherwise collide with Copilot state.
 - `UnityContext` carries provider and one `UnityCodeAgentPaths`; `ServiceBootstrap`, `AgentService`, `ChatEditorWindowClient`, `EventStreamCursorStore`, and `ActiveSessionState` each assume one backend. The current runtime path is `.unityCodeAgent/service/`, the endpoint manifest is version 1 with no service identity, and the event cursor is global.
 - The chat surface is UI Toolkit (`ChatWindow.uxml`/`ChatWindow.uss`), while the settings inspector currently uses IMGUI. The new toolbar selector must be a UXML/USS control; the settings selector must still write the same serialized mode and notify an open chat window so both surfaces cannot drift.
-- The current contracts expose health, model listing, mapped session list/create/open/send/abort, tool-result completion, no-Unity stop, and one global SSE stream. JSON DTOs use PascalCase, send/abort/tool results return 202, stale tool results return 404, and SSE replay uses `Last-Event-ID` plus a manifest stream-generation ID.
+- The current contracts expose health, model listing, session list/create/open/send/abort, tool-result completion, no-Unity stop, and one global SSE stream. JSON DTOs use PascalCase, send/abort/tool results return 202, stale tool results return 404, and SSE replay uses `Last-Event-ID` plus a manifest stream-generation ID.
+- Existing Unity session IDs are self-describing: `UnityCodeAgentSession-{yyyyMMddHHmmssfff}-{sanitizedProjectRoot}`. `UnityCodeAgentSessionIds.TryParse` recovers the timestamp and project identity, and `AgentService` uses that parsed project identity to filter the service inventory. The chat client already treats the service's returned `AgentSessionResponseDto.SessionId` as authoritative after creation.
 - The official [Codex Python SDK](https://github.com/openai/codex/tree/main/sdk/python) now supports Python 3.10+, reuses existing Codex authentication, and installs a matching pinned `openai-codex-cli-bin` runtime. Its async API exposes model listing, thread start/list/resume/read, streamed typed/unknown notifications, turn interruption, compaction, workspace-write sandboxing, and automatic approval review. The implementation must pin a published SDK release in `uv.lock`, not depend on the moving `main` branch.
 - `AsyncCodex.thread_start` and `thread_resume` accept a thread-scoped raw `config` object. Use that seam for MCP and skill overrides, with an integration test against the locked SDK proving that the process-private MCP server is visible only to the intended thread. Do not write Unity-generated MCP configuration to the user's global Codex config.
 - The official SDK routes turn notifications by turn ID and documents concurrent active turns on one client. That supports one lifespan-owned client, per-session operation serialization, and cross-session concurrency without one Codex process per Unity session.
@@ -51,7 +52,7 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 ### Python Codex service
 
 - Create `Packages/com.signal-loop.unitycodeagent/Editor/CodexService~` as a Python 3.12 packaged project with `pyproject.toml`, checked-in `uv.lock`, `src/`, `tests/`, and a console entry point.
-- Use FastAPI, Uvicorn, Pydantic, SQLite, the official Python MCP SDK, and the asynchronous `openai-codex` SDK.
+- Use FastAPI, Uvicorn, Pydantic, the official Python MCP SDK, and the asynchronous `openai-codex` SDK.
 - Launch with `uv run --locked --no-dev --project <CodexService~> unity-code-agent-codex-service`.
 - Set `UV_PROJECT_ENVIRONMENT` and `UV_CACHE_DIR` so the virtual environment and cache live under `.unityCodeAgent/services/codex/`, never under the installed package. Require uv on PATH and report an actionable error instead of installing it silently.
 - Run one long-lived AsyncCodex client from the application lifespan and use the SDK-bundled Codex runtime by default.
@@ -71,12 +72,16 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - Treat InfiniteSessions.Enabled as enabling Codex-native compaction. Accept existing fractional threshold fields for compatibility without translating them into undocumented token limits; log one compatibility warning.
 - Translate configured skill directories, disabled skills, and supported stdio or Streamable HTTP MCP configuration into per-thread Codex configuration without modifying global Codex settings.
 
-### Session and Unity-tool isolation
+### Self-describing session identity and Unity-tool isolation
 
-- Keep the Unity session ID separate from the Codex thread ID. Persist mappings and request configuration signatures in a Codex-owned, schema-versioned SQLite database using WAL mode.
-- List only mapped sessions and never expose unrelated threads from the user's general Codex history.
-- Persist creation atomically, recover mappings after restart, and resume the mapped thread when opening a session.
-- Rebuild the existing contract history on open from `thread_read(include_turns=True)`, translating only the mapped thread and normalizing any turn left busy by a service crash to an interrupted/idle state.
+- Preserve existing Copilot session IDs and extend only Codex IDs as `UnityCodeAgentSession-{yyyyMMddHHmmssfff}-{sanitizedProjectRoot}.codex.{base64urlUtf8ThreadId}`. The `.codex.` delimiter is unambiguous because sanitized project roots contain only letters, digits, and underscores, while base64url does not contain `.`.
+- Extend the shared Unity session-ID parser with an optional runtime kind and decoded runtime session ID. Continue accepting the legacy format unchanged; require a canonical, non-empty base64url thread ID for the Codex suffix.
+- Treat the create request's legacy-format SessionId as a provisional identity and idempotency key. Start the Codex thread, append its encoded native ID, persist the complete composite ID through the supported Codex `thread/name/set` API, and return that final ID in `AgentSessionResponseDto.SessionId`.
+- Decode and validate the native Codex thread ID directly from the composite SessionId for open, send, abort, SSE, and Unity tool-result operations. Do not add a Unity-to-Codex mapping database or a separate session catalogue.
+- List Codex threads with exact project `cwd` and the applicable app-server source filter, then expose only threads whose persisted name parses as a canonical UnityCodeAgent Codex ID, matches the requested project, and embeds the same native ID as the listed thread. Never expose unrelated or renamed general Codex history.
+- Make create retry-safe by serializing the provisional ID in process and, before starting a thread, returning an existing valid named thread whose composite ID begins with that exact provisional ID. A crash between thread creation and naming may leave a hidden orphan; document and test that bounded failure mode because the SDK start and name operations cannot be one transaction.
+- Verify against the locked SDK that thread naming is supported, persists across client restarts, and is returned by thread listing. If the high-level SDK omits it, use only a supported SDK/app-server adapter seam; do not edit or scrape the user's Codex storage files.
+- Rebuild the existing contract history on open from `thread_read(include_turns=True)`, translating only the decoded thread and normalizing any turn left busy by a service crash to an interrupted/idle state.
 - Serialize operations within one session while allowing different sessions to execute concurrently.
 - Host a process-private Streamable HTTP MCP endpoint for Unity tools supplied through the service contract.
 - Protect it with an unguessable per-process token and scope its tool registry to the external session.
@@ -98,10 +103,10 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 
 ### Reliability and operations
 
-- Let the FastAPI lifespan own the Codex client, database, event broker, turns, and pending tool calls.
+- Let the FastAPI lifespan own the Codex client, event broker, turns, create-idempotency gates, and pending tool calls.
 - Publish manifests atomically and delete one only while it remains owned by the stopping process.
 - Monitor the parent Unity process unless no-Unity mode is enabled. Gracefully interrupt turns, fail tool futures, close resources, and remove only owned runtime state.
-- Report healthy only after database and Codex adapter initialization. Return sanitized degraded details for dependency, runtime, or authentication failures.
+- Report healthy only after Codex adapter initialization and the locked-SDK thread-name/list capability check. Return sanitized degraded details for dependency, runtime, or authentication failures.
 - Use structured rotating logs and never log credentials, MCP authorization headers, binary bodies, or base64 data.
 - Preserve telemetry switches with backend-neutral agent names and a Codex service identity. Capture prompt/response content only when explicitly enabled.
 - Bound queues and timeouts. Retry overloads only for idempotent operations; never blindly retry thread creation or turn submission.
@@ -111,6 +116,7 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 - Make `AgentServiceMode { GitHubCopilot = 0, Byok = 1, Codex = 2 }` the only configurable service/provider selector.
 - Do not add an independently configurable AgentServiceBackend setting; internal backend kind is derived and read-only.
 - Preserve existing OpenAPI, AsyncAPI, and shared DTO wire shapes.
+- Preserve legacy Copilot session IDs; for Codex, use the service-returned canonical composite SessionId as the single contract, UI, event, and tool-correlation identity.
 - Keep Copilot as the default and preserve existing GitHub Copilot and BYOK behavior.
 - Do not import, migrate, share, merge, or deduplicate sessions between services.
 - Pin the Codex SDK and all dependencies through uv.lock.
@@ -120,7 +126,7 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 ### Python and contract tests
 
 - Test every contract route, documented status, PascalCase payload, validation error, and AsyncAPI event example with a fake Codex adapter.
-- Cover session mappings, persistence, restart recovery, missing threads, reattachment, same-session serialization, cross-session concurrency, and isolation.
+- Cover legacy and Codex composite session-ID parsing, canonical encoding, malformed suffix rejection, persisted thread-name discovery, restart recovery, renamed/unrelated thread exclusion, missing threads, create retries and the start-before-name crash window, reattachment, same-session serialization, cross-session concurrency, and isolation.
 - Cover deltas, stable keys, ordering, replay, heartbeat, unknown events, backpressure, abort races, and SDK failures.
 - Cover MCP tool discovery and text, image, resource, and error results, including timeout, cancellation, mismatch, and late results.
 - Cover authentication/model failures, lifecycle startup, manifest ownership, parent exit, no-Unity stop, and shutdown.
@@ -139,7 +145,7 @@ Create a service exchangeable with `Packages/com.signal-loop.unitycodeagent/Edit
 
 - Create a Copilot session, switch to Codex, confirm it is absent, create a Codex session, switch back, and confirm both inventories remain isolated after restarts.
 - Stream a Codex response and complete a Unity tool invocation, including an image result.
-- Resume a mapped Codex session after restarting only Codex.
+- Resume a Codex session from its composite SessionId after restarting only Codex, with no mapping database or catalogue.
 - Confirm active work blocks switching.
 - Confirm missing uv or Codex authentication produces actionable errors.
 - Confirm existing GitHub Copilot and BYOK workflows continue without migration prompts.
@@ -179,7 +185,7 @@ System_Boundary(uca, "UnityCodeAgent") {
   Container(copilotService, "Copilot Service", ".NET 8 / Copilot SDK", "Changed runtime paths; existing GitHub Copilot and BYOK behavior")
   Container(codexService, "Codex Service", "Python / FastAPI / Codex SDK", "New: Codex sessions, events, tools, and lifecycle")
   ContainerDb(copilotState, "Copilot State", "Manifest/logs/session state", "Changed: isolated Copilot runtime")
-  ContainerDb(codexState, "Codex State", "SQLite/manifest/logs", "New: isolated Codex runtime")
+  Container(codexState, "Codex Runtime State", "Manifest/log files", "New: isolated service runtime; no session mapping store")
 }
 Rel(user, ui, "Chooses mode and chats")
 Rel(ui, client, "Single AgentServiceMode")
@@ -206,17 +212,17 @@ Container_Boundary(codexService, "Codex Agent Service") {
   Component(api, "Contract API", "FastAPI/Pydantic", "New: HTTP and SSE contracts")
   Component(coordinator, "Session Coordinator", "Python", "New: session lifecycle and turns")
   Component(adapter, "Codex SDK Adapter", "Python", "New: AsyncCodex operations")
+  Component(identity, "Session Identity Codec", "C# and Python", "Changed/new: legacy IDs plus reversible Codex thread suffix")
   Component(events, "Event Broker", "Python", "New: sequences, retains, and streams events")
   Component(tools, "Unity MCP Bridge", "Python MCP SDK", "New: relays Unity tools")
-  ComponentDb(store, "Session Store", "SQLite", "New: external-to-Codex thread mappings")
 }
 Rel(mode, registry, "Resolved by")
 Rel(registry, bootstrap, "Provides descriptor")
 Rel(registry, chat, "Provides request and cache behavior")
 Rel(chat, api, "HTTP + SSE when Codex selected")
 Rel(api, coordinator, "Delegates")
-Rel(coordinator, adapter, "Runs threads and turns")
-Rel(coordinator, store, "Persists mappings")
+Rel(coordinator, identity, "Creates and decodes composite IDs")
+Rel(coordinator, adapter, "Lists, names, resumes, and operates on native threads")
 Rel(adapter, events, "Publishes notifications")
 Rel(adapter, tools, "Calls Unity tools")
 Rel(tools, events, "Publishes invocation requests")
@@ -259,7 +265,9 @@ classDiagram
     class CodexSdkAdapter {
         <<new>>
         +ListModelsAsync()
+        +ListThreadsAsync()
         +StartThreadAsync()
+        +SetThreadNameAsync()
         +ResumeThreadAsync()
         +StartTurnAsync()
         +InterruptTurnAsync()
@@ -271,18 +279,53 @@ classDiagram
         +SendAsync()
         +AbortAsync()
     }
-    class SessionMappingStore {
-        <<new>>
-        +SaveMappingAsync()
-        +FindMappingAsync()
-        +ListMappingsAsync()
+    class UnityCodeAgentSessionIds {
+        <<changed>>
+        +Create(paths, timestamp) string
+        +CreateCodex(provisionalId, threadId) string
+        +TryParse(sessionId) UnityCodeAgentSessionId
+    }
+    class UnityCodeAgentSessionId {
+        <<changed>>
+        +TimestampUtc
+        +SanitizedProjectRoot
+        +RuntimeKind
+        +RuntimeSessionId
     }
     AgentServiceDescriptorRegistry --> AgentServiceMode : resolves
     AgentServiceDescriptorRegistry --> AgentServiceDescriptor : creates
     ServiceBootstrap --> AgentServiceDescriptor : consumes snapshot
     ChatEditorWindowClient --> AgentServiceDescriptorRegistry : resolves mode
     CodexSessionCoordinator --> CodexSdkAdapter
-    CodexSessionCoordinator --> SessionMappingStore
+    CodexSessionCoordinator --> UnityCodeAgentSessionIds
+    UnityCodeAgentSessionIds --> UnityCodeAgentSessionId
+```
+
+### Codex Session Identity Flow
+
+```mermaid
+sequenceDiagram
+    participant Unity as Unity Agent Client
+    participant Service as Codex Session Coordinator
+    participant Codec as Session Identity Codec
+    participant Codex as Codex SDK
+    Unity->>Codec: Create timestamp/project provisional ID
+    Unity->>Service: Create(provisional SessionId)
+    Service->>Codex: List project app-server threads
+    alt Valid persisted name starts with provisional ID
+        Codex-->>Service: Existing thread and composite name
+        Service-->>Unity: Existing composite SessionId
+    else No retry match
+        Service->>Codex: Start thread
+        Codex-->>Service: Native thread ID
+        Service->>Codec: Append .codex.base64url(thread ID)
+        Codec-->>Service: Composite SessionId
+        Service->>Codex: Set thread name to composite SessionId
+        Service-->>Unity: Composite SessionId
+    end
+    Unity->>Service: Open/send/abort(composite SessionId)
+    Service->>Codec: Decode and validate native thread ID
+    Service->>Codex: Resume or operate on native thread ID
 ```
 
 ### Switching Flow
@@ -305,7 +348,7 @@ sequenceDiagram
         Client->>Old: Close current SSE subscription
         Client->>New: Start or reconnect
         Client->>New: Open backend-specific SSE
-        Client->>New: Load models and mapped sessions
+        Client->>New: Load models and backend-owned sessions
         New-->>Client: Selected backend inventory
         Client-->>UI: Render selected backend state
         Note over Client,New: No session or provider state is copied from Old
@@ -320,3 +363,4 @@ sequenceDiagram
 - Block switching during active work instead of implicitly aborting it.
 - uv must already be on PATH; first launch may download locked Python or dependencies.
 - Keep the contracts backend-neutral and do not add a second service/provider selector.
+- Reserve the canonical composite Codex thread name as UnityCodeAgent ownership metadata; a user-renamed thread is intentionally excluded from UnityCodeAgent discovery rather than guessed or recovered from unrelated history.
