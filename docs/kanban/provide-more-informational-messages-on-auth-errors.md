@@ -1,6 +1,6 @@
 # Provide more informational messages on auth errors
-- status: Ready
-- order: 100
+- status: Backlog
+- order: 543
 - goal: Show provider-specific authentication failure guidance for BYOK and GitHub Copilot paths in settings, chat errors, and chat progress messages, verified by focused service/client/UI tests, without exposing API keys or changing successful model/session behavior.
 - updated: 2026-06-24
 - steps:

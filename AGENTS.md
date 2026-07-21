@@ -59,7 +59,6 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 ## Verification
 
 - Always ensure that changes are discovered and reloaded by Unity Editor - check by name if new tests are discovered, check UI if changes are visible and use other methods to ensure that Unity Editor discovered changes and reloaded domain. If not, reload the domain using script. This is mandatory step and cannot be omitted.
-- For Unity/editor changes, prefer Unity EditMode tests, Unity console logs, and targeted `execute_csharp_script_in_unity_editor` checks.
 - For service changes, prefer focused `dotnet test` runs in `CopilotService.Tests`.
 - When running Codex skill validation scripts that import `yaml`, use `uv run --with pyyaml ...` instead of the ambient Python interpreter.
 - When the local `UnityCodeCopilot.Service` process may already be running, run service tests with an isolated artifact path so the build does not try to overwrite the live exe:

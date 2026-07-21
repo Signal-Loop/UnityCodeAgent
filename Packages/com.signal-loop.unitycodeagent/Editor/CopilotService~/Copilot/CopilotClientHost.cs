@@ -169,7 +169,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
             CopilotSession session;
             try
             {
-                session = await client.CreateSessionAsync(new SessionConfig
+                var config = new SessionConfig
                 {
                     SessionId = request.SessionId,
                     ClientName = ClientName,
@@ -183,7 +183,9 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
                     InfiniteSessions = ToInfiniteSessionConfig(request.InfiniteSessions),
                     OnPermissionRequest = PermissionHandler.ApproveAll,
                     WorkingDirectory = request.WorkingDirectory,
-                }, cancellationToken);
+                };
+                UnityCodeSystemMessage.ApplyTo(config);
+                session = await client.CreateSessionAsync(config, cancellationToken);
             }
             catch (Exception exception) when (request.Provider?.HasByok == true && CopilotAuthFailureClassifier.IsAuthenticationFailure(exception))
             {
@@ -226,7 +228,7 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
             CopilotSession session;
             try
             {
-                session = await client.ResumeSessionAsync(request.SessionId, new ResumeSessionConfig
+                var config = new ResumeSessionConfig
                 {
                     ClientName = ClientName,
                     Model = request.Model,
@@ -239,7 +241,9 @@ public sealed class CopilotClientHost : IHostedService, IAsyncDisposable, IAgent
                     InfiniteSessions = ToInfiniteSessionConfig(request.InfiniteSessions),
                     OnPermissionRequest = PermissionHandler.ApproveAll,
                     WorkingDirectory = request.WorkingDirectory,
-                }, cancellationToken);
+                };
+                UnityCodeSystemMessage.ApplyTo(config);
+                session = await client.ResumeSessionAsync(request.SessionId, config, cancellationToken);
             }
             catch (Exception exception) when (request.Provider?.HasByok == true && CopilotAuthFailureClassifier.IsAuthenticationFailure(exception))
             {

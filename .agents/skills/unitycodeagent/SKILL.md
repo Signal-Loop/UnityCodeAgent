@@ -9,11 +9,10 @@ description: 'Use when an agent must work in Unity, build games, inspect or modi
 
 1. Available Tools
 2. Core Principles
-3. Forbidden Patterns
-4. Usage Workflow
-5. Debugging Loop
-6. Script Context and APIs
-7. Common Scripting Patterns
+3. Usage Workflow
+4. Debugging Loop
+5. Script Context and APIs
+6. Common Scripting Patterns
 
 ---
 
@@ -24,8 +23,8 @@ This skill coordinates three tools within one workflow. Use the tool that matche
 | Tool                                    | Purpose                                                 | When to Use                                                                                                                                                                                        |
 | --------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `execute_csharp_script_in_unity_editor` | Executes C# code in the live Unity Editor (Roslyn)      | Modifying scenes, GameObjects, Components, Prefabs, ScriptableObjects, or running Editor automation. Script output and logs are returned directly in the tool result.                              |
-| `read_unity_console_logs`               | Reads recent entries from the Unity Editor Console      | Before executing an Editor script or Unity test when the task depends on compiled C# code. Also useful when debugging unexpected Editor state.                                                   |
-| `run_unity_tests`                       | Runs EditMode or PlayMode Unity tests via TestRunnerApi | After editing C# source files to verify logic correctness. Do not use it for ad-hoc code execution, and do not run it solely because an Editor script was executed.                              |
+| `read_unity_console_logs`               | Reads recent entries from the Unity Editor Console      | Diagnosing compilation errors, runtime exceptions, unexpected Editor state, asset imports, and other Editor activity.                                                                            |
+| `run_unity_tests`                       | Runs EditMode or PlayMode Unity tests via TestRunnerApi | Verifying Unity behavior through the Test Framework, optionally narrowed to fully qualified test names.                                                                                          |
 
 ---
 
@@ -38,43 +37,19 @@ Use `execute_csharp_script_in_unity_editor` for live Unity Editor work:
 - Batch-process or automate Editor tasks.
 - Compute values with Unity math and physics APIs such as `Mathf`, `Vector3`, `Quaternion`, and `Physics` when the result depends on Unity behavior.
 
-Do not use `execute_csharp_script_in_unity_editor` for these tasks:
+Package installation and ProjectSettings changes require dedicated project tooling or a narrower explicit workflow.
 
-- Editing C# source files. Use file editing tools.
-- Reading or writing plain text, JSON, YAML, or other project files. Use file tools.
-- Installing packages or changing ProjectSettings. Use dedicated project tooling or a narrower explicit workflow.
-- Running Unity tests. Use `run_unity_tests`.
-
-The tool runs raw C# top-level statements in the Unity Editor with Roslyn. It executes synchronously on the main thread, has access to the loaded Unity/project assemblies, captures `Debug.Log()`, `Debug.LogError()`, and the final evaluated expression, and marks the active scene dirty after successful execution in edit mode.
+The tool uses Roslyn in the Unity Editor, has access to loaded Unity/project assemblies, captures `Debug.Log()`, `Debug.LogError()`, and the final evaluated expression, and marks the active scene dirty after successful execution in edit mode.
 
 ---
 
 ## Core Principles
 
-- **Top-Level Statements Only:** Write flat code. Do **not** wrap code in a class, method, or `[MenuItem]`. Provide only the sequence of statements and any required `using` directives.
 - **Pre-Imported Namespaces:** `System`, `System.Collections.Generic`, `System.Linq`, `UnityEngine`, `UnityEditor` are always available. Do **not** redeclare them with `using`.
 - **Explicit Usings for Others:** Declare any namespace not in the pre-imported list (e.g., `using UnityEngine.UI;`).
-- **Idempotency:** Scripts must be safe to rerun. Check for existence before creating or adding to avoid duplicates. Use helper patterns like `GetOrAddComponent` and `CreateOrGetGameObject`.
-- **Synchronous Only:** Do **not** use `async`/`await`, `Task`, or `Task.Run`. All Unity Editor APIs are main-thread-only and synchronous.
-- **Null Checks:** Always use `== null` for Unity objects. Do **not** use `??` or `?.` — Unity objects override the `==` operator in ways that break null-conditional operators.
 - **Specificity:** Prefer fully qualified names (e.g., `UnityEngine.GameObject`, `UnityEditor.AssetDatabase`) to avoid ambiguity.
-- **Script Feedback:** Use `UnityEngine.Debug.Log()` to report what the script did. Use `UnityEngine.Debug.LogError()` for failures. The tool captures both plus the final evaluated expression.
 - **Clarity & Error Handling:** Comment non-obvious logic. Wrap risky operations in `try-catch` and log errors with context.
 - **Object class ambiguity:** Always use `UnityEngine.Object` when referring to Unity objects to avoid confusion with `System.Object`.
-
----
-
-## Forbidden Patterns
-
-**CRITICAL:** Never simulate an action or fabricate output if the API is unavailable.
-
-- **Do NOT** log messages claiming to "simulate" or "pretend" a modification was made.
-- **Do NOT** create placeholder logic that does nothing and logs fake success.
-- **Do NOT** use `execute_csharp_script_in_unity_editor` to create or edit C# source files — use file editing tools instead.
-- **Do NOT** use `execute_csharp_script_in_unity_editor` to read/write plain text, JSON, or YAML files — use file tools instead.
-- **Do NOT** use `execute_csharp_script_in_unity_editor` to run tests — use `run_unity_tests` instead.
-- **Do NOT** use background threads (`Thread`, `Task.Run`) — all Unity Editor APIs require the main thread.
-- **Do NOT** use `async`/`await` inside scripts.
 
 ---
 
@@ -83,13 +58,10 @@ The tool runs raw C# top-level statements in the Unity Editor with Roslyn. It ex
 Use the applicable steps in this order for each task. Skip only the steps that do not apply.
 
 1. **Analyze Requirements:** Understand what needs to be created, modified, or queried. Identify target GameObjects, Components, assets, source files, and expected outcome.
-2. **Check for Compilation Errors:** If the task depends on compiled C# code, call `read_unity_console_logs` (max_entries: 20) before executing any Editor script or Unity test. Prior C# file edits may have broken the build. Do not proceed until compilation errors are resolved.
-3. **Analyze Unity Context:** When the task needs scene, prefab, or asset inspection, use `execute_csharp_script_in_unity_editor` to inspect hierarchy, existing components, and current asset state. Identify edge cases such as missing objects, duplicate components, or invalid asset paths.
-4. **Plan the Action:** Determine which Unity APIs are needed and whether the task requires Editor scripting, source-file edits, Unity tests, or some combination of them.
-5. **Write the Script or Source Change:** Apply all Core Principles. For Editor scripts, add idempotency guards, null checks, `Debug.Log` for significant actions, and `try-catch` for risky operations.
-6. **Execute the Script:** When using Editor automation, call `execute_csharp_script_in_unity_editor`. All `Debug.Log` and `Debug.LogError` output is returned directly in the tool result — no separate log read is needed.
-7. **Run Tests When Source Changed:** If you edited compiled C# source files, run the narrowest relevant Unity tests with `run_unity_tests` after the code compiles cleanly.
-8. **Fix and Retry:** If script execution, compilation, or tests fail, apply the Debugging Loop before reporting completion.
+2. **Analyze Unity Context:** Inspect the hierarchy, existing components, and current asset state when needed. Identify edge cases such as missing objects, duplicate components, or invalid asset paths.
+3. **Plan the Action:** Determine the Unity APIs and assets involved, and separate Editor automation from source-file work and test verification.
+4. **Execute the Action:** Use the appropriate Unity API patterns and Core Principles for the selected operation.
+5. **Fix and Retry:** If execution, compilation, or tests fail, apply the Debugging Loop before reporting completion.
 
 ---
 
@@ -98,7 +70,7 @@ Use the applicable steps in this order for each task. Skip only the steps that d
 When a script execution returns errors or unexpected results:
 
 1. Read the error message and stack trace returned directly in the tool result.
-2. If the error suggests a compilation failure (e.g., type not found, missing member), call `read_unity_console_logs` (max_entries: 30) to identify the source C# file causing the build error, fix it, then re-execute.
+2. If the error suggests a compilation failure (e.g., type not found, missing member), use the console details to identify and fix the source file, then re-execute.
 3. Otherwise, identify the root cause from the script output: missing object, bad asset path, wrong API usage, or null reference.
 4. Fix the script and re-execute.
 5. Repeat until the tool result confirms success with no errors.
@@ -138,7 +110,6 @@ Only loaded assemblies are available.
 
 #### Loading Additional Assemblies:
 
-Additional assemblies are defined in `AdditionalAssemblyNames` list in `Assets/Plugins/UnityCodeAgent/Editor/UnityCodeAgentSettings.asset`. Add any assembly name there (e.g., "MyCustomAssembly") and it will be loaded and available in the script context.
 When encountering errors about missing types or namespaces, like `error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)`:
 
 1. Identify the required assembly and namespace for the API you are trying to use.
@@ -200,8 +171,6 @@ UnityEngine.Debug.Log("HUD_Panel configured");
 ```
 
 ### Modifying Prefab Assets
-
-**CRITICAL:** Always use the Load → Modify → Save → Unload cycle. Never edit a prefab in-scene to affect the asset.
 
 ```csharp
 string path = "Assets/Prefabs/MyPrefab.prefab";

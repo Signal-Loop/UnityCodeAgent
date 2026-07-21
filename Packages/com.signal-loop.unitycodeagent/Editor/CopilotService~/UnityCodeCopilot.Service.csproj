@@ -20,4 +20,8 @@
   <ItemGroup>
     <Compile Include="..\Contracts\ServiceContracts.cs" Link="Contracts\ServiceContracts.cs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UnityCodeCopilot.Service.Tests" />
+  </ItemGroup>
 </Project>
