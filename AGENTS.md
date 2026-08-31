@@ -45,6 +45,7 @@ Shared DTOs live in `Packages/com.signal-loop.unitycodeagent/Editor/Contracts/Se
 - Follow SOLID, YAGNI, and KISS.
 - Add robust logging and use appropriate log levels.
 - Do not create Unit Editor .meta files. Wait for unity to recompile and generate them automatically.
+- Every piece of new logic must land as its own small, reusable, tested module behind an existing seam, imported where needed. Never append it to an existing big file.
 
 ## Git operations
 
