@@ -14,9 +14,9 @@ import re
 from pathlib import Path
 
 
-STATUSES = ("Backlog", "Started", "Planning", "Ready", "ToDo", "InProgress", "Completed")
-GOAL_REQUIRED_STATUSES = frozenset(("Ready", "ToDo", "InProgress", "Completed"))
-PROPERTY_PATTERN = re.compile(r"^\s*-\s*([a-z][a-z_-]*)\s*:\s*(.*?)\s*$", re.MULTILINE)
+STATUSES = ("Backlog", "Planning", "InProgress", "Completed")
+GOAL_REQUIRED_STATUSES = frozenset(STATUSES[1:])
+PROPERTY_PATTERN = re.compile(r"^[ \t]*-[ \t]*([a-z][a-z_-]*)[ \t]*:[ \t]*([^\r\n]*?)[ \t]*$", re.MULTILINE)
 TITLE_PATTERN = re.compile(r"^#\s+(\S.*?)\s*$", re.MULTILINE)
 
 
@@ -32,14 +32,14 @@ def validate_task(path: Path, root: Path) -> list[str]:
     properties = parse_properties(content)
     errors: list[str] = []
 
+    status = properties.get("status", "")
+    if "status" not in properties or status == "Backlog":
+        return errors
+    if status not in STATUSES:
+        errors.append(f"{relative_path}: invalid `status: {status}`; use one of: {', '.join(STATUSES)}.")
+
     if not TITLE_PATTERN.search(content):
         errors.append(f"{relative_path}: missing required H1 task title; add `# ...` before the task properties.")
-
-    status = properties.get("status", "")
-    if not status:
-        errors.append(f"{relative_path}: missing required `status` property; use one of: {', '.join(STATUSES)}.")
-    elif status not in STATUSES:
-        errors.append(f"{relative_path}: invalid `status: {status}`; use one of: {', '.join(STATUSES)}.")
 
     order = properties.get("order", "")
     if not order:
@@ -54,13 +54,13 @@ def validate_task(path: Path, root: Path) -> list[str]:
 
 
 def task_files(root: Path) -> list[Path]:
-    """Find markdown task files while ignoring board documentation."""
-    return sorted(path for path in root.rglob("*.md") if path.name.lower() != "readme.md")
+    """Find direct-child Markdown task files without filename exceptions."""
+    return sorted(path for path in root.iterdir() if path.is_file() and path.suffix.lower() == ".md")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate property-based kanban task files.")
-    parser.add_argument("task_root", nargs="?", type=Path, default=Path("docs/kanban"))
+    parser.add_argument("task_root", nargs="?", type=Path, default=Path(".workbench/tasks"))
     args = parser.parse_args()
     root = args.task_root.resolve()
 
